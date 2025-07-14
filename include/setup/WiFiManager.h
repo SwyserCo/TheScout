@@ -4,9 +4,9 @@
 #include <DNSServer.h>
 #include <Preferences.h>
 
-class WiFiManagerGuardian {
+class WiFiManager {
 public:
-  WiFiManagerGuardian();
+  WiFiManager();
   void begin();
   void startCaptivePortal();
   bool loadCredentials();

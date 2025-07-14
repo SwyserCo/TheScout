@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "setup/WiFiManagerGuardian.h"
+#include "setup/WiFiManager.h"
 #include "utility/FactoryResetHandler.h"
 #include "utility/StatusLEDController.h"
 #include "setup/MQTTClientHandler.h"
@@ -10,7 +10,7 @@
 #define SYSTEM_LED_PIN 3
 #define ACTIVITY_LED_PIN 45
 
-WiFiManagerGuardian wifiManager;
+WiFiManager wifiManager;
 StatusLEDController ledController(SYSTEM_LED_PIN, ACTIVITY_LED_PIN);
 FactoryResetHandler resetHandler(RESET_BUTTON_PIN, wifiManager, ledController);
 VEML7700Sensor lightSensor;

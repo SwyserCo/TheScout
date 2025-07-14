@@ -1,6 +1,6 @@
 #include "utility/FactoryResetHandler.h"
 
-FactoryResetHandler::FactoryResetHandler(uint8_t buttonPin, WiFiManagerGuardian& wifiManager, StatusLEDController& ledController)
+FactoryResetHandler::FactoryResetHandler(uint8_t buttonPin, WiFiManager& wifiManager, StatusLEDController& ledController)
   : buttonPin(buttonPin), wifiManager(wifiManager), ledController(ledController) {}
 
 void FactoryResetHandler::update() {

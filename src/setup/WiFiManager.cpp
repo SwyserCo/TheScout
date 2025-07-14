@@ -1,16 +1,16 @@
-#include "setup/WiFiManagerGuardian.h"
+#include "setup/WiFiManager.h"
 #include "utility/StatusLEDController.h"
 
-WebServer* WiFiManagerGuardian::serverInstance = nullptr;
+WebServer* WiFiManager::serverInstance = nullptr;
 
 #define SYSTEM_LED_PIN 3
 #define ACTIVITY_LED_PIN 45
 
 StatusLEDController statusLED(SYSTEM_LED_PIN, ACTIVITY_LED_PIN);
 
-WiFiManagerGuardian::WiFiManagerGuardian() : server(80) {}
+WiFiManager::WiFiManager() : server(80) {}
 
-void WiFiManagerGuardian::begin() {
+void WiFiManager::begin() {
   setServerInstance(&server);
   statusLED.begin();
 
@@ -22,7 +22,7 @@ void WiFiManagerGuardian::begin() {
   }
 }
 
-bool WiFiManagerGuardian::loadCredentials() {
+bool WiFiManager::loadCredentials() {
   preferences.begin("wifi", true);
   String ssid = preferences.getString("ssid", "");
   String password = preferences.getString("password", "");
@@ -30,20 +30,20 @@ bool WiFiManagerGuardian::loadCredentials() {
   return ssid.length() > 0 && password.length() > 0;
 }
 
-void WiFiManagerGuardian::saveCredentials(const String& ssid, const String& password) {
+void WiFiManager::saveCredentials(const String& ssid, const String& password) {
   preferences.begin("wifi", false);
   preferences.putString("ssid", ssid);
   preferences.putString("password", password);
   preferences.end();
 }
 
-void WiFiManagerGuardian::clearCredentials() {
+void WiFiManager::clearCredentials() {
   preferences.begin("wifi", false);
   preferences.clear();
   preferences.end();
 }
 
-void WiFiManagerGuardian::connectToWiFi() {
+void WiFiManager::connectToWiFi() {
   preferences.begin("wifi", true);
   String ssid = preferences.getString("ssid", "");
   String password = preferences.getString("password", "");
@@ -79,7 +79,7 @@ void WiFiManagerGuardian::connectToWiFi() {
   }
 }
 
-void WiFiManagerGuardian::startCaptivePortal() {
+void WiFiManager::startCaptivePortal() {
   String apName = "TheScout-Setup";
   WiFi.softAP(apName.c_str());
   Serial.print("Access Point: ");
@@ -87,11 +87,11 @@ void WiFiManagerGuardian::startCaptivePortal() {
 
   dnsServer.start(53, "*", WiFi.softAPIP());
 
-  server.on("/", std::bind(&WiFiManagerGuardian::handleRoot, this));
-  server.on("/save", HTTP_POST, std::bind(&WiFiManagerGuardian::handleSave, this));
-  server.on("/generate_204", std::bind(&WiFiManagerGuardian::handleRoot, this));
-  server.on("/connecttest.txt", std::bind(&WiFiManagerGuardian::handleRoot, this));
-  server.onNotFound(std::bind(&WiFiManagerGuardian::handleRoot, this));
+  server.on("/", std::bind(&WiFiManager::handleRoot, this));
+  server.on("/save", HTTP_POST, std::bind(&WiFiManager::handleSave, this));
+  server.on("/generate_204", std::bind(&WiFiManager::handleRoot, this));
+  server.on("/connecttest.txt", std::bind(&WiFiManager::handleRoot, this));
+  server.onNotFound(std::bind(&WiFiManager::handleRoot, this));
 
   server.begin();
 
@@ -107,7 +107,7 @@ void WiFiManagerGuardian::startCaptivePortal() {
   ESP.restart();
 }
 
-void WiFiManagerGuardian::handleRoot() {
+void WiFiManager::handleRoot() {
   String html = R"rawliteral(
     <!DOCTYPE html>
     <html>
@@ -163,7 +163,7 @@ void WiFiManagerGuardian::handleRoot() {
   server.send(200, "text/html", html);
 }
 
-void WiFiManagerGuardian::handleSave() {
+void WiFiManager::handleSave() {
   if (server.hasArg("ssid") && server.hasArg("password")) {
     saveCredentials(server.arg("ssid"), server.arg("password"));
     server.send(200, "text/html", "Saved. Rebooting...");
@@ -174,14 +174,14 @@ void WiFiManagerGuardian::handleSave() {
   }
 }
 
-void WiFiManagerGuardian::setServerInstance(WebServer* instance) {
+void WiFiManager::setServerInstance(WebServer* instance) {
   serverInstance = instance;
 }
 
-WebServer& WiFiManagerGuardian::getServer() {
+WebServer& WiFiManager::getServer() {
   return *serverInstance;
 }
 
-const char* WiFiManagerGuardian::getHostname() {
+const char* WiFiManager::getHostname() {
   return WiFi.getHostname();
 }
