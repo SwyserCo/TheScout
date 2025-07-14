@@ -22,7 +22,7 @@ private:
     const char* mqttClientId;
 
     void reconnect();
-    void publishSensorConfig(const char* objectId, const char* name, const char* stateTopic,
+    void publishSensorConfig(const char* objectId, const char* name, const String& stateTopic,
                              const char* unit, const char* deviceClass,
                              const char* payloadOn = nullptr, const char* payloadOff = nullptr);
 };

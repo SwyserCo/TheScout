@@ -1,7 +1,9 @@
 #include "setup/WiFiManager.h"
 #include "utility/StatusLEDController.h"
+#include <Preferences.h>
 
 WebServer* WiFiManager::serverInstance = nullptr;
+String WiFiManager::deviceName;  // <-- This line fixes the linker error
 
 #define SYSTEM_LED_PIN 3
 #define ACTIVITY_LED_PIN 45
@@ -13,6 +15,18 @@ WiFiManager::WiFiManager() : server(80) {}
 void WiFiManager::begin() {
   setServerInstance(&server);
   statusLED.begin();
+
+  // Load or generate persistent device name
+  Preferences preferences;
+  preferences.begin("guardian", false);
+  if (!preferences.isKey("deviceName")) {
+    String uniqueName = "TheScout-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+    preferences.putString("deviceName", uniqueName);
+    deviceName = uniqueName;
+  } else {
+    deviceName = preferences.getString("deviceName");
+  }
+  preferences.end();
 
   if (!loadCredentials()) {
     statusLED.flashSystemRed(3);
@@ -41,6 +55,10 @@ void WiFiManager::clearCredentials() {
   preferences.begin("wifi", false);
   preferences.clear();
   preferences.end();
+
+  preferences.begin("guardian", false);
+  preferences.clear();
+  preferences.end();
 }
 
 void WiFiManager::connectToWiFi() {
@@ -65,11 +83,9 @@ void WiFiManager::connectToWiFi() {
     Serial.println("Connected to WiFi!");
     Serial.println(WiFi.localIP());
 
-    String uniqueID = String((uint32_t)ESP.getEfuseMac(), HEX);
-    String hostname = "TheScout-" + uniqueID;
-    WiFi.setHostname(hostname.c_str());
+    WiFi.setHostname(deviceName.c_str());
     Serial.print("Hostname set to: ");
-    Serial.println(hostname);
+    Serial.println(deviceName);
 
     statusLED.flashSystemGreen(3);
   } else {
@@ -183,5 +199,5 @@ WebServer& WiFiManager::getServer() {
 }
 
 const char* WiFiManager::getHostname() {
-  return WiFi.getHostname();
+  return deviceName.c_str();
 }

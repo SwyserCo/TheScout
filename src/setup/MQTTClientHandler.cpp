@@ -34,39 +34,39 @@ void MQTTClientHandler::reconnect() {
 void MQTTClientHandler::publishLux(float lux) {
     char payload[16];
     dtostrf(lux, 6, 2, payload);
-    client.publish("guardian/thescout/ambient_light", payload);
+    client.publish((String("guardian/") + mqttClientId + "/ambient_light").c_str(), payload);
 }
 
 void MQTTClientHandler::publishTemperature(float temperature) {
     char payload[16];
     dtostrf(temperature, 6, 2, payload);
-    client.publish("guardian/thescout/temperature", payload);
+    client.publish((String("guardian/") + mqttClientId + "/temperature").c_str(), payload);
 }
 
 void MQTTClientHandler::publishHumidity(float humidity) {
     char payload[16];
     dtostrf(humidity, 6, 2, payload);
-    client.publish("guardian/thescout/humidity", payload);
+    client.publish((String("guardian/") + mqttClientId + "/humidity").c_str(), payload);
 }
 
 void MQTTClientHandler::publishPressure(float pressure) {
     char payload[16];
     dtostrf(pressure, 6, 2, payload);
-    client.publish("guardian/thescout/pressure", payload);
+    client.publish((String("guardian/") + mqttClientId + "/pressure").c_str(), payload);
 }
 
 void MQTTClientHandler::publishDiscovery() {
     Serial.println("Publishing MQTT discovery messages...");
-    publishSensorConfig("ambient_light", "Ambient Light", "guardian/thescout/ambient_light", "lx", "illuminance");
-    publishSensorConfig("presence", "Presence", "guardian/thescout/presence", nullptr, "motion", "1", "0");
-    publishSensorConfig("temperature", "Temperature", "guardian/thescout/temperature", "°C", "temperature");
-    publishSensorConfig("humidity", "Humidity", "guardian/thescout/humidity", "%", "humidity");
-    publishSensorConfig("co2", "CO2", "guardian/thescout/co2", "ppm", "carbon_dioxide");
-    publishSensorConfig("tamper", "Tamper", "guardian/thescout/tamper", nullptr, "vibration", "1", "0");
-    publishSensorConfig("spl", "Sound Level", "guardian/thescout/spl", "dB", nullptr);
+    publishSensorConfig("ambient_light", "Ambient Light", String("guardian/") + mqttClientId + "/ambient_light", "lx", "illuminance");
+    publishSensorConfig("presence", "Presence", String("guardian/") + mqttClientId + "/presence", nullptr, "motion", "1", "0");
+    publishSensorConfig("temperature", "Temperature", String("guardian/") + mqttClientId + "/temperature", "°C", "temperature");
+    publishSensorConfig("humidity", "Humidity", String("guardian/") + mqttClientId + "/humidity", "%", "humidity");
+    publishSensorConfig("co2", "CO2", String("guardian/") + mqttClientId + "/co2", "ppm", "carbon_dioxide");
+    publishSensorConfig("tamper", "Tamper", String("guardian/") + mqttClientId + "/tamper", nullptr, "vibration", "1", "0");
+    publishSensorConfig("spl", "Sound Level", String("guardian/") + mqttClientId + "/spl", "dB", nullptr);
 }
 
-void MQTTClientHandler::publishSensorConfig(const char* objectId, const char* name, const char* stateTopic,
+void MQTTClientHandler::publishSensorConfig(const char* objectId, const char* name, const String& stateTopic,
                                             const char* unit, const char* deviceClass,
                                             const char* payloadOn, const char* payloadOff) {
     String topic = "homeassistant/sensor/";
@@ -77,7 +77,7 @@ void MQTTClientHandler::publishSensorConfig(const char* objectId, const char* na
 
     String payload = "{";
     payload += "\"name\": \"" + String(name) + "\",";
-    payload += "\"state_topic\": \"" + String(stateTopic) + "\",";
+    payload += "\"state_topic\": \"" + stateTopic + "\",";
     if (unit) {
         payload += "\"unit_of_measurement\": \"" + String(unit) + "\",";
     }

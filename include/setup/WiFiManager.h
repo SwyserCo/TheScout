@@ -13,7 +13,7 @@ public:
   void saveCredentials(const String& ssid, const String& password);
   void clearCredentials();
   void connectToWiFi();
-  const char* getHostname();  // New method to retrieve the hostname
+  const char* getHostname();  // Retrieves the persistent device name
 
 private:
   Preferences preferences;
@@ -30,4 +30,6 @@ private:
   static WebServer* serverInstance;
   static void setServerInstance(WebServer* instance);
   static WebServer& getServer();
+
+  static String deviceName;  // <-- Add this line to store the persistent device name
 };
