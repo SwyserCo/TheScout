@@ -1,19 +1,24 @@
 #pragma once
 #include <Arduino.h>
 #include "setup/WiFiManager.h"
-#include "StatusLEDController.h"
+#include "utility/StatusLEDController.h"
 
 class FactoryResetHandler {
 public:
-  FactoryResetHandler(uint8_t buttonPin, WiFiManager& wifiManager, StatusLEDController& ledController);
+  FactoryResetHandler(WiFiManager& wifiManager, StatusLEDController& ledController);
+  void begin();   // Call this once in setup()
   void update();  // Call this from loop()
 
 private:
-  uint8_t buttonPin;
   WiFiManager& wifiManager;
   StatusLEDController& ledController;
 
+  static constexpr uint8_t RESET_BUTTON_PIN = 2;
+
   bool isPressed = false;
-  unsigned long pressStartTime = 0;
   bool resetTriggered = false;
+  bool flashState = false;
+
+  unsigned long pressStartTime = 0;
+  unsigned long lastFlashTime = 0;
 };

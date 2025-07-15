@@ -1,35 +1,42 @@
 #include "utility/FactoryResetHandler.h"
+#include "config/Colors.h"
 
-FactoryResetHandler::FactoryResetHandler(uint8_t buttonPin, WiFiManager& wifiManager, StatusLEDController& ledController)
-  : buttonPin(buttonPin), wifiManager(wifiManager), ledController(ledController) {}
+FactoryResetHandler::FactoryResetHandler(WiFiManager& wifiManager, StatusLEDController& ledController)
+  : wifiManager(wifiManager), ledController(ledController) {}
+
+#define RESET_BUTTON_PIN 3
+
+void FactoryResetHandler::begin() {
+  pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
+}
 
 void FactoryResetHandler::update() {
-  pinMode(buttonPin, INPUT_PULLUP);
-  bool buttonState = digitalRead(buttonPin) == LOW;
+  bool buttonState = digitalRead(RESET_BUTTON_PIN) == LOW;
+  unsigned long now = millis();
 
   if (buttonState && !isPressed) {
-    // Button just pressed
     isPressed = true;
-    pressStartTime = millis();
+    pressStartTime = now;
+    lastFlashTime = now;
+    flashState = false;
     Serial.println("Factory reset button pressed.");
   }
 
   if (!buttonState && isPressed) {
-    // Button released before timeout
     isPressed = false;
     pressStartTime = 0;
     Serial.println("Factory reset cancelled (button released too early).");
+    ledController.setSystemLED(COLOR_OFF);
   }
 
-  if (isPressed && !resetTriggered && (millis() - pressStartTime >= 5000)) {
+  if (isPressed && !resetTriggered && (now - pressStartTime >= 5000)) {
     Serial.println("Factory reset confirmed. Clearing Wi-Fi credentials...");
     wifiManager.clearCredentials();
 
-    // Flash system LED blue 3 times
     for (int i = 0; i < 3; i++) {
-      ledController.setSystemColor(0, 0, 255);  // Blue
+      ledController.setSystemLED(COLOR_BLUE);
       delay(300);
-      ledController.clearSystem();
+      ledController.setSystemLED(COLOR_OFF);
       delay(300);
     }
 
@@ -38,8 +45,10 @@ void FactoryResetHandler::update() {
     resetTriggered = true;
   }
 
-  // Optional: flash red every second while holding
-  if (isPressed && !resetTriggered && (millis() - pressStartTime) % 1000 < 50) {
-    ledController.flashSystemRed(1);
+  // Non-blocking red flash while holding
+  if (isPressed && !resetTriggered && (now - lastFlashTime >= 500)) {
+    flashState = !flashState;
+    ledController.setSystemLED(flashState ? COLOR_RED : COLOR_OFF);
+    lastFlashTime = now;
   }
 }

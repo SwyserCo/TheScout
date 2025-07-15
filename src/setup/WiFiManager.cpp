@@ -1,5 +1,6 @@
 #include "setup/WiFiManager.h"
 #include "utility/StatusLEDController.h"
+#include "config/Colors.h"
 #include "Preferences.h"
 #include "utility/BuzzerController.h"
 
@@ -10,7 +11,7 @@ extern BuzzerController buzzer;
 #define SYSTEM_LED_PIN 3
 #define ACTIVITY_LED_PIN 45
 
-StatusLEDController statusLED(SYSTEM_LED_PIN, ACTIVITY_LED_PIN);
+StatusLEDController statusLED;
 
 WiFiManager::WiFiManager() : server(80) {}
 
@@ -18,7 +19,6 @@ void WiFiManager::begin() {
   setServerInstance(&server);
   statusLED.begin();
 
-  // Load or generate persistent device name
   Preferences preferences;
   preferences.begin("guardian", false);
   if (!preferences.isKey("deviceName")) {
@@ -31,7 +31,7 @@ void WiFiManager::begin() {
   preferences.end();
 
   if (!loadCredentials()) {
-    statusLED.flashSystemRed(3);
+    statusLED.flashSystemLED(COLOR_RED, 3);
     startCaptivePortal();
   } else {
     connectToWiFi();
@@ -71,13 +71,12 @@ void WiFiManager::connectToWiFi() {
 
   WiFi.begin(ssid.c_str(), password.c_str());
   Serial.print("Connecting to WiFi");
-  
 
   int retries = 0;
   while (WiFi.status() != WL_CONNECTED && retries < 20) {
     delay(500);
     Serial.print(".");
-    statusLED.flashSystemRed(1);
+    statusLED.flashSystemLED(COLOR_RED, 1);
     retries++;
   }
   Serial.println();
@@ -91,10 +90,10 @@ void WiFiManager::connectToWiFi() {
     Serial.print("Hostname set to: ");
     Serial.println(deviceName);
 
-    statusLED.flashSystemGreen(3);
+    statusLED.flashSystemLED(COLOR_GREEN, 3);
   } else {
     Serial.println("Failed to connect. Starting AP mode.");
-    statusLED.flashSystemRed(3);
+    statusLED.flashSystemLED(COLOR_RED, 3);
     startCaptivePortal();
   }
 }

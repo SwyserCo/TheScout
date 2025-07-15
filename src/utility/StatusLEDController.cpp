@@ -1,8 +1,8 @@
 #include "utility/StatusLEDController.h"
 
-StatusLEDController::StatusLEDController(uint8_t systemLEDPin, uint8_t activityLEDPin)
-  : systemLED(1, systemLEDPin, NEO_GRB + NEO_KHZ800),
-    activityLED(1, activityLEDPin, NEO_GRB + NEO_KHZ800) {}
+StatusLEDController::StatusLEDController()
+  : systemLED(1, SYSTEM_LED_PIN, NEO_GRB + NEO_KHZ800),
+    activityLED(1, ACTIVITY_LED_PIN, NEO_GRB + NEO_KHZ800) {}
 
 void StatusLEDController::begin() {
   systemLED.begin();
@@ -11,34 +11,34 @@ void StatusLEDController::begin() {
   activityLED.show();
 }
 
-void StatusLEDController::flashSystemRed(int times) {
+void StatusLEDController::flashSystemLED(uint32_t color, int times) {
   for (int i = 0; i < times; i++) {
-    systemLED.setPixelColor(0, systemLED.Color(255, 0, 0));
+    systemLED.setPixelColor(0, color);
     systemLED.show();
-    delay(300);
+    delay(FLASH_DURATION);
     systemLED.clear();
     systemLED.show();
-    delay(300);
+    delay(FLASH_INTERVAL);
   }
 }
 
-void StatusLEDController::flashSystemGreen(int times) {
+void StatusLEDController::setSystemLED(uint32_t color) {
+  systemLED.setPixelColor(0, color);
+  systemLED.show();
+}
+
+void StatusLEDController::flashActivityLED(uint32_t color, int times) {
   for (int i = 0; i < times; i++) {
-    systemLED.setPixelColor(0, systemLED.Color(0, 255, 0));
-    systemLED.show();
-    delay(300);
-    systemLED.clear();
-    systemLED.show();
-    delay(300);
+    activityLED.setPixelColor(0, color);
+    activityLED.show();
+    delay(FLASH_DURATION);
+    activityLED.clear();
+    activityLED.show();
+    delay(FLASH_INTERVAL);
   }
 }
 
-void StatusLEDController::setSystemColor(uint8_t r, uint8_t g, uint8_t b) {
-  systemLED.setPixelColor(0, systemLED.Color(r, g, b));
-  systemLED.show();
-}
-
-void StatusLEDController::clearSystem() {
-  systemLED.clear();
-  systemLED.show();
+void StatusLEDController::setActivityLED(uint32_t color) {
+  activityLED.setPixelColor(0, color);
+  activityLED.show();
 }
