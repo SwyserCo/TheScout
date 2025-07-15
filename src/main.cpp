@@ -1,10 +1,18 @@
 #include <Arduino.h>
+
+//setup includes
+#include "setup/MQTTClientHandler.h"
 #include "setup/WiFiManager.h"
+
+//utility includes
 #include "utility/FactoryResetHandler.h"
 #include "utility/StatusLEDController.h"
-#include "setup/MQTTClientHandler.h"
+#include "utility/BuzzerController.h"
+
+//sensor includes
 #include "sensors/VEML7700Sensor.h"
 #include "sensors/BME280Sensor.h"
+
 
 #define RESET_BUTTON_PIN 2
 #define SYSTEM_LED_PIN 3
@@ -15,6 +23,7 @@ StatusLEDController ledController(SYSTEM_LED_PIN, ACTIVITY_LED_PIN);
 FactoryResetHandler resetHandler(RESET_BUTTON_PIN, wifiManager, ledController);
 VEML7700Sensor lightSensor;
 BME280Sensor bmeSensor;
+BuzzerController buzzer;
 
 MQTTClientHandler* mqttHandler;
 
@@ -41,6 +50,7 @@ void setup() {
     if (!bmeSensor.begin()) {
         Serial.println("BME280 not found");
     }
+    buzzer.begin();
 }
 
 void loop() {
