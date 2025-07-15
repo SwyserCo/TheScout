@@ -34,6 +34,7 @@ void setup() {
     while (!Serial);
     Serial.println("Start!");
 
+    buzzer.begin();
     ledController.begin();
     wifiManager.begin();
 
@@ -50,7 +51,6 @@ void setup() {
     if (!bmeSensor.begin()) {
         Serial.println("BME280 not found");
     }
-    buzzer.begin();
 }
 
 void loop() {

@@ -1,9 +1,11 @@
 #include "setup/WiFiManager.h"
 #include "utility/StatusLEDController.h"
-#include <Preferences.h>
+#include "Preferences.h"
+#include "utility/BuzzerController.h"
 
 WebServer* WiFiManager::serverInstance = nullptr;
-String WiFiManager::deviceName;  // <-- This line fixes the linker error
+String WiFiManager::deviceName;
+extern BuzzerController buzzer;
 
 #define SYSTEM_LED_PIN 3
 #define ACTIVITY_LED_PIN 45
@@ -69,6 +71,7 @@ void WiFiManager::connectToWiFi() {
 
   WiFi.begin(ssid.c_str(), password.c_str());
   Serial.print("Connecting to WiFi");
+  
 
   int retries = 0;
   while (WiFi.status() != WL_CONNECTED && retries < 20) {
@@ -82,6 +85,7 @@ void WiFiManager::connectToWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("Connected to WiFi!");
     Serial.println(WiFi.localIP());
+    buzzer.beep(2500, 100, 1);
 
     WiFi.setHostname(deviceName.c_str());
     Serial.print("Hostname set to: ");
