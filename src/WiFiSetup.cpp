@@ -1,8 +1,9 @@
 #include "WiFiSetup.h"
 #include <EEPROM.h>
+#include <ESPmDNS.h>
 
-const char* AP_SSID = "Scout-Setup";
-const char* AP_PASSWORD = "12345678";
+// Setup AP SSID
+const char* AP_SSID = "TheScout Setup";
 const char* HTML_FORM = R"(
 <!DOCTYPE html>
 <html>
@@ -80,16 +81,43 @@ String WiFiSetup::getDeviceID() const {
 
 void WiFiSetup::startAP() {
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(AP_SSID, AP_PASSWORD);
+    // Create open AP for easy setup
+    WiFi.softAP(AP_SSID);
     
-    dnsServer.start(53, "*", WiFi.softAPIP());
+    // Configure DNS server to redirect all requests to our IP
+    IPAddress apIP = WiFi.softAPIP();
+    dnsServer.start(53, "*", apIP);
+    
+    // Set up mDNS responder for captive portal detection
+    if (MDNS.begin("thescout")) {
+        MDNS.addService("http", "tcp", 80);
+    }
+    
     setupWebServer();
     apMode = true;
+    
+#if DEBUG
+    Serial.println("Access Point Started");
+    Serial.print("SSID: ");
+    Serial.println(AP_SSID);
+    Serial.print("AP IP address: ");
+    Serial.println(apIP);
+#endif
 }
 
 void WiFiSetup::setupWebServer() {
+    // Handle captive portal detection
+    webServer.on("/generate_204", HTTP_GET, [this]() { handleRoot(); });  // Android captive portal detection
+    webServer.on("/fwlink", HTTP_GET, [this]() { handleRoot(); });       // Microsoft captive portal detection
+    webServer.on("/hotspot-detect.html", HTTP_GET, [this]() { handleRoot(); }); // Apple captive portal detection
+    
+    // Handle main pages
     webServer.on("/", HTTP_GET, [this]() { handleRoot(); });
     webServer.on("/save", HTTP_POST, [this]() { handleSave(); });
+    
+    // Catch-all handler for captive portal
+    webServer.onNotFound([this]() { handleRoot(); });
+    
     webServer.begin();
 }
 

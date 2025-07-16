@@ -175,6 +175,15 @@ void handleMQTTCommand(const JsonDocument& doc) {
 }
 
 void handleAlarmState(AlarmController::State state, AlarmController::Trigger trigger) {
+    // Save state to persistent storage
+    preferences.begin("alarm", false);  // false = R/W mode
+    preferences.putUChar("state", static_cast<uint8_t>(state));
+    if (state == AlarmController::State::TRIGGERED) {
+        preferences.putUChar("trigger", static_cast<uint8_t>(trigger));
+        preferences.putULong("trigger_time", millis());
+    }
+    preferences.end();
+
     switch (state) {
         case AlarmController::State::ARMED:
             ledController->setActivityPattern(ActivityPattern::ARMED);
@@ -286,6 +295,30 @@ void setup() {
     // Initialize alarm system with LED and Buzzer controllers
     alarmController.begin(ledController.get(), buzzerController.get());
     alarmController.setStateCallback(handleAlarmState);
+
+    // Restore last known alarm state
+    preferences.begin("alarm", true);  // true = read-only mode
+    if (preferences.isKey("state")) {
+        auto savedState = static_cast<AlarmController::State>(preferences.getUChar("state"));
+        if (savedState == AlarmController::State::ARMED) {
+            alarmController.arm();
+        } else if (savedState == AlarmController::State::TRIGGERED) {
+            // Only restore triggered state if it was recent (within last hour)
+            unsigned long triggerTime = preferences.getULong("trigger_time", 0);
+            if (millis() - triggerTime < 3600000) {
+                auto savedTrigger = static_cast<AlarmController::Trigger>(preferences.getUChar("trigger"));
+                // Simulate the trigger through sensor events
+                if (savedTrigger == AlarmController::Trigger::MOTION) {
+                    alarmController.onMotionDetected(true);
+                } else if (savedTrigger == AlarmController::Trigger::SOUND) {
+                    alarmController.onSoundDetected(100.0f); // Threshold value
+                } else if (savedTrigger == AlarmController::Trigger::TAMPER) {
+                    alarmController.onTamperDetected(true);
+                }
+            }
+        }
+    }
+    preferences.end();
     
     // Initialize tamper detection
     tamperDetection.begin();
@@ -300,15 +333,6 @@ void setup() {
 void loop() {
     // Feed the watchdog
     esp_task_wdt_reset();
-
-    // Check power status
-    if (digitalRead(Config::POWER_GOOD) == LOW) {
-        // On battery power - implement power saving
-        if (!isConnected) {
-            // Increase delay when disconnected to save power
-            delay(100);
-        }
-    }
 
     // Update WiFi and check connection
     wifiSetup.handle();
@@ -362,17 +386,9 @@ void loop() {
         }
     }
 
-    // Dynamic delay based on system state
+    // Maintain consistent fast update rate for responsiveness
     unsigned long updateDuration = millis() - now;
-    unsigned long delayTime;
-    
-    if (!isConnected) {
-        delayTime = 100; // Longer delay when disconnected
-    } else if (alarmController.isTriggered()) {
-        delayTime = 5; // Fast updates during alarm
-    } else {
-        delayTime = max(10UL, 50 - updateDuration); // Target ~50ms cycle
+    if (updateDuration < 10) { // Target 100Hz update rate
+        delay(1);  // Minimal delay to prevent CPU hogging
     }
-    
-    delay(delayTime);
 }
