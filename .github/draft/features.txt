@@ -1,0 +1,26 @@
+Okay, great question!
+
+Behind the scenes:
+The foundational things. The device should be able to integrate with Home assistant using MQTT. It should support Auto Discovery. For this auto discovery, https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery should be followed. Keeping in mind the each device will have multiple sensors that should be shown in Home Assistant.
+
+Security:
+This device will form part of a security system and like I mentioned it will be integrated with Home assistant. For this, I think that a specific MQTT topic would be needed to to signal when the security system has been armed or disarmed. This is important because some of the sensors will need to react to this status. In the sensors below, I will specify when and how the should react to this status change. The device should also be able to publish to a topic that signals that the alarm has been triggered. This should only be possible if the alarm has been armed. Once again, I will specify this for each sensor or specific case.
+
+Home automation:
+Besides security, this device will also be used to set up advanced home automations in Home assistant. For the sensors below, I will also define what data should be visible in Home assistant.
+
+Device setup:
+The make the setup of the device easy, it should use WifiManager to help the consumer setup the device and connect it to his Wifi. The device should also create a unique device name starting with "TheScout". This information, wifi and device name, should be stored using Preferences. When trying to connect to the Wifi the system LED should flash red and once connected to the wifi the system LED should stop flashing red and flash green 3 times. Also, it would be great if the buzzer could play a short chime to signal that it is connected.
+
+Sensors: 
+Next there is tampering detection using the Accelerometer. When the alarm has been armed and the device is moved and keeps moving for 3 seconds, measured by the accelerometer, the alarm should be activated.
+
+Next is sound detection, on the device is an SPL microphone. If the alarm is armed and the SPL microphone, should spend some time to first calibrate itself with the level of background noise. After a short calibration, if the SPL mic detects a very loud noise, or some noise for more than 5 seconds, it should trigger the alarm.
+
+The Activity LED, this LED is purely for signaling the status of the alarm system. If the security system is armed. The LED should be turned on. If the alarm has been triggered, the LED should be flashing until turned off. If the alarm is disarmed, the LED should not be turned off.
+
+The last security related sensor is the LD2420 presence detection sensor. When the alarm has been armed and the LD2420 detects movement for more than 5 seconds, Alarm should be triggered. Keep in mind that this it change in precense should also be visible in home assistant.
+
+The device also has a BME280 sensor, that can sense the temperature, humidity and barometric pressure. This information should also be visible in home assistant.
+
+The device also has a VEML7700 light sensor, this information should also be available in home assistant.

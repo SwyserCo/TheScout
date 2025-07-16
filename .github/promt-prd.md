@@ -12,6 +12,8 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - Offer clear user feedback through LEDs and buzzer.
 - Allow control of a physical relay for automating dumb devices.
 - Include factory reset functionality for recovery and reconfiguration.
+- Allow configurable sensor thresholds via MQTT or local configuration.
+- Provide debug logging and diagnostics via MQTT or serial output.
 
 ## User Stories
 
@@ -58,7 +60,22 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - Wi-Fi configuration is erased.
 - Device reboots into setup mode.
 
+### User Story 6: Sensor Threshold Configuration
+**As an integrator**, I want to adjust sensor thresholds remotely so I can fine-tune detection sensitivity for different environments.
+
+**Acceptance Criteria:**
+- Sensor thresholds (e.g., SPL mic, LD2420) can be configured via MQTT or local config file.
+- Threshold changes take effect without reflashing firmware.
+
+### User Story 7: Debug Logging
+**As a developer**, I want to receive debug logs via MQTT or serial so I can troubleshoot issues during development and deployment.
+
+**Acceptance Criteria:**
+- Device publishes debug logs to a dedicated MQTT topic or serial output.
+- Logs include sensor events, connection status, and alarm triggers.
+
 ## Functional Requirements
+
 - WiFiManager setup with captive portal and Preferences storage.
 - Unique device name generation starting with `TheScout-XXXX`.
 - MQTT connection and auto-discovery for all sensors.
@@ -80,6 +97,8 @@ The Scout is a compact, sensor-rich device designed for home security and automa
   - Activity LED: on (armed), flashing (alarm)
   - Buzzer: chimes for success, failure, timeout
 - Factory reset via IO02 button.
+- Configurable sensor thresholds via MQTT or local config.
+- Debug logging via MQTT or serial output.
 
 ## Non-Goals
 
@@ -119,9 +138,11 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - Relay toggles within 500ms
 - 0 false alarms during 24h idle test
 - 100% feedback accuracy for LEDs and buzzer
+- Sensor thresholds can be updated and verified via MQTT
+- Debug logs are accessible and informative
 
 ## Open Questions
 
 - Should alarm state be latched or auto-reset?
-- Should sensor thresholds be configurable via MQTT?
+- Should sensor thresholds be persisted across reboots?
 - Should relay support timed activation (e.g., auto-off after 5s)?
