@@ -32,23 +32,23 @@ public:
 private:
     WiFiClient espClient;
     PubSubClient client;
-    std::string deviceId;
+    String deviceId;
     CommandCallback commandCallback;
     ThresholdsCallback thresholdsCallback;
     unsigned long lastReconnectAttempt;
     
     // Topics
-    std::string statusTopic;
-    std::string motionTopic;
-    std::string environmentTopic;
-    std::string lightTopic;
-    std::string soundTopic;
-    std::string tamperTopic;
-    std::string commandTopic;
-    std::string responseTopic;
-    std::string thresholdsTopic;
-    std::string thresholdsSetTopic;
-    std::string alarmTopic;
+    String statusTopic;
+    String motionTopic;
+    String environmentTopic;
+    String lightTopic;
+    String soundTopic;
+    String tamperTopic;
+    String commandTopic;
+    String responseTopic;
+    String thresholdsTopic;
+    String thresholdsSetTopic;
+    String alarmTopic;
     
     // Helper functions
     void setupTopics();

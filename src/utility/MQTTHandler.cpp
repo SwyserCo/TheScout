@@ -12,7 +12,7 @@ constexpr char HA_DEVICE_CLASS_SOUND[] = "sound";
 MQTTHandler::MQTTHandler() : client(espClient), lastReconnectAttempt(0), commandCallback(nullptr), thresholdsCallback(nullptr) {}
 
 void MQTTHandler::begin(const String& deviceId) {
-    this->deviceId = std::string(deviceId.c_str());
+    this->deviceId = deviceId;
     client.setServer(Config::MQTT_SERVER, Config::MQTT_PORT);
     client.setCallback([this](char* topic, uint8_t* payload, unsigned int length) {
         this->handleCallback(topic, payload, length);
@@ -24,19 +24,19 @@ void MQTTHandler::begin(const String& deviceId) {
 }
 
 void MQTTHandler::setupTopics() {
-    String base = String(Config::Topics::BASE) + String(deviceId.c_str()) + "/";
+    String base = String(Config::Topics::BASE) + deviceId + "/";
     
-    statusTopic = std::string((base + Config::Topics::STATUS).c_str());
-    motionTopic = std::string((base + Config::Topics::MOTION).c_str());
-    environmentTopic = std::string((base + Config::Topics::ENVIRONMENT).c_str());
-    lightTopic = std::string((base + Config::Topics::LIGHT).c_str());
-    soundTopic = std::string((base + Config::Topics::SOUND).c_str());
-    tamperTopic = std::string((base + Config::Topics::TAMPER).c_str());
-    commandTopic = std::string((base + Config::Topics::COMMAND).c_str());
-    responseTopic = std::string((base + Config::Topics::RESPONSE).c_str());
-    thresholdsTopic = std::string((base + Config::Topics::THRESHOLDS).c_str());
-    thresholdsSetTopic = std::string((base + Config::Topics::THRESHOLDS_SET).c_str());
-    alarmTopic = std::string((base + Config::Topics::ALARM).c_str());
+    statusTopic = base + Config::Topics::STATUS;
+    motionTopic = base + Config::Topics::MOTION;
+    environmentTopic = base + Config::Topics::ENVIRONMENT;
+    lightTopic = base + Config::Topics::LIGHT;
+    soundTopic = base + Config::Topics::SOUND;
+    tamperTopic = base + Config::Topics::TAMPER;
+    commandTopic = base + Config::Topics::COMMAND;
+    responseTopic = base + Config::Topics::RESPONSE;
+    thresholdsTopic = base + Config::Topics::THRESHOLDS;
+    thresholdsSetTopic = base + Config::Topics::THRESHOLDS_SET;
+    alarmTopic = base + Config::Topics::ALARM;
 }
 
 void MQTTHandler::update() {
@@ -82,66 +82,66 @@ void MQTTHandler::publishDiscoveryConfig() {
     String topic;
     
     // Temperature Sensor
-    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + String(deviceId.c_str()) + "/temperature/config";
+    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + deviceId + "/temperature/config";
     doc.clear();
-    String tempName = String(deviceId.c_str()) + " Temperature";
+    String tempName = deviceId + " Temperature";
     doc["name"] = tempName.c_str();
     doc["device_class"] = HA_DEVICE_CLASS_TEMP;
     doc["unit_of_measurement"] = "°C";
     doc["state_topic"] = environmentTopic.c_str();
     doc["value_template"] = "{{ value_json.temperature }}";
-    String tempId = String(deviceId.c_str()) + "_temperature";
+    String tempId = deviceId + "_temperature";
     doc["unique_id"] = tempId.c_str();
     publishJson(topic.c_str(), doc);
     
     // Humidity Sensor
-    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + String(deviceId.c_str()) + "/humidity/config";
+    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + deviceId + "/humidity/config";
     doc.clear();
-    String humName = String(deviceId.c_str()) + " Humidity";
+    String humName = deviceId + " Humidity";
     doc["name"] = humName.c_str();
     doc["device_class"] = HA_DEVICE_CLASS_HUMID;
     doc["unit_of_measurement"] = "%";
     doc["state_topic"] = environmentTopic.c_str();
     doc["value_template"] = "{{ value_json.humidity }}";
-    String humId = String(deviceId.c_str()) + "_humidity";
+    String humId = deviceId + "_humidity";
     doc["unique_id"] = humId.c_str();
     publishJson(topic.c_str(), doc);
     
     // Light Sensor
-    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + String(deviceId.c_str()) + "/light/config";
+    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + deviceId + "/light/config";
     doc.clear();
-    String lightName = String(deviceId.c_str()) + " Light";
+    String lightName = deviceId + " Light";
     doc["name"] = lightName.c_str();
     doc["device_class"] = HA_DEVICE_CLASS_ILLUM;
     doc["unit_of_measurement"] = "lx";
     doc["state_topic"] = lightTopic.c_str();
     doc["value_template"] = "{{ value_json.lux }}";
-    String lightId = String(deviceId.c_str()) + "_light";
+    String lightId = deviceId + "_light";
     doc["unique_id"] = lightId.c_str();
     publishJson(topic.c_str(), doc);
     
     // Motion Sensor
-    topic = String(HA_DISCOVERY_PREFIX) + "/binary_sensor/" + String(deviceId.c_str()) + "/motion/config";
+    topic = String(HA_DISCOVERY_PREFIX) + "/binary_sensor/" + deviceId + "/motion/config";
     doc.clear();
-    String motionName = String(deviceId.c_str()) + " Motion";
+    String motionName = deviceId + " Motion";
     doc["name"] = motionName.c_str();
     doc["device_class"] = HA_DEVICE_CLASS_MOTION;
     doc["state_topic"] = motionTopic.c_str();
     doc["value_template"] = "{{ value_json.presence }}";
-    String motionId = String(deviceId.c_str()) + "_motion";
+    String motionId = deviceId + "_motion";
     doc["unique_id"] = motionId.c_str();
     publishJson(topic.c_str(), doc);
     
     // Sound Level
-    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + String(deviceId.c_str()) + "/sound/config";
+    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + deviceId + "/sound/config";
     doc.clear();
-    String soundName = String(deviceId.c_str()) + " Sound Level";
+    String soundName = deviceId + " Sound Level";
     doc["name"] = soundName.c_str();
     doc["device_class"] = HA_DEVICE_CLASS_SOUND;
     doc["unit_of_measurement"] = "dB";
     doc["state_topic"] = soundTopic.c_str();
     doc["value_template"] = "{{ value_json.level }}";
-    String soundId = String(deviceId.c_str()) + "_sound";
+    String soundId = deviceId + "_sound";
     doc["unique_id"] = soundId.c_str();
     publishJson(topic.c_str(), doc);
 }
