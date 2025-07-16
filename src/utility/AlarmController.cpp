@@ -1,6 +1,8 @@
 #include "utility/AlarmController.h"
 
-void AlarmController::begin() {
+void AlarmController::begin(LEDController* led, BuzzerController* buzzer) {
+    ledController = led;
+    buzzerController = buzzer;
     currentState = State::DISARMED;
     currentTrigger = Trigger::NONE;
 }
@@ -53,6 +55,16 @@ void AlarmController::setSoundLevelThreshold(float level) {
 
 void AlarmController::onMotionDetected(bool detected) {
     motionDetected = detected;
+    
+    // Always update LED feedback
+    if (detected) {
+        ledController->setActivityPattern(ActivityPattern::MOTION);
+        buzzerController->playChime(BuzzerChime::MOTION);
+    } else {
+        ledController->setActivityPattern(ActivityPattern::OFF);
+    }
+    
+    // Handle alarm state
     if (detected && currentState == State::ARMED) {
         if (motionStartTime == 0) {
             motionStartTime = millis();

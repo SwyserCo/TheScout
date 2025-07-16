@@ -61,6 +61,8 @@ namespace Config {
     constexpr uint32_t SENSOR_READ_INTERVAL = 1000;     // 1 second
     constexpr uint32_t STATUS_UPDATE_INTERVAL = 30000;  // 30 seconds
     constexpr uint32_t WATCHDOG_TIMEOUT = 30000;        // 30 seconds
+    constexpr uint32_t WIFI_SETUP_TIMEOUT = 120000;     // 2 minutes
+    constexpr uint8_t SENSOR_INIT_RETRIES = 3;         // Number of retries for sensor initialization
 
     // Storage Keys
     namespace Storage {
@@ -74,6 +76,18 @@ namespace Config {
     constexpr uint16_t DEFAULT_MOTION_THRESHOLD = 50;
     constexpr uint16_t DEFAULT_SOUND_THRESHOLD = 1000;
     constexpr uint16_t DEFAULT_LIGHT_THRESHOLD = 500;
+    
+    // LED Settings
+    constexpr uint8_t LED_DEFAULT_BRIGHTNESS = 128;     // Default LED brightness (0-255)
+    constexpr uint8_t LED_DIM_BRIGHTNESS = 32;         // Dimmed LED brightness
+    constexpr uint32_t LED_BLINK_INTERVAL = 500;       // Default blink interval in ms
+    constexpr uint32_t LED_FAST_BLINK_INTERVAL = 200;  // Fast blink interval in ms
+    constexpr uint32_t LED_PULSE_DURATION = 1000;      // Duration of one pulse cycle
+    
+    // Buzzer Settings
+    constexpr uint32_t BUZZER_BEEP_DURATION = 100;     // Duration of a single beep
+    constexpr uint32_t BUZZER_ALARM_INTERVAL = 1000;   // Interval between alarm sounds
+    constexpr uint32_t BUZZER_PATTERN_PAUSE = 500;     // Pause between pattern repetitions
     
     // Topic Templates
     namespace Topics {

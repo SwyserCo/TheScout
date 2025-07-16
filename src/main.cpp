@@ -57,11 +57,12 @@ void handleTamper(bool tampered) {
     mqttHandler.publishTamper(tampered);
     
     if (tampered) {
-        ledController->setRGBColor(255, 0, 0);
-        ledController->setRGBPattern(LEDPattern::BLINK_FAST);
+        ledController->setSystemPattern(SystemPattern::ALARM);
+        ledController->setActivityPattern(ActivityPattern::ALARM);
         buzzerController->playPattern(BuzzerPattern::ALARM);
     } else {
-        ledController->setRGBPattern(LEDPattern::OFF);
+        ledController->setSystemPattern(SystemPattern::NORMAL);
+        ledController->setActivityPattern(ActivityPattern::OFF);
         buzzerController->stop();
     }
 }
@@ -102,41 +103,68 @@ void setup() {
     Serial.begin(115200);
 #endif
 
-    // Initialize components
+    // Initialize components with startup indication
     ledController->begin();
+    ledController->setSystemPattern(SystemPattern::STARTUP);
+    
     buzzerController->begin();
+    buzzerController->playChime(BuzzerChime::STARTUP);
+    
     resetHandler.begin();
     
     // Show startup indication
     ledController->setSystemPattern(SystemPattern::CONNECTING);
     
-    // Setup factory reset handler
-    resetHandler.setResetCallback([](void) {
-        ledController->setSystemPattern(SystemPattern::ERROR);
-        buzzerController->playChime(BuzzerChime::ERROR);
+    // Setup factory reset handler with proper feedback
+    resetHandler.setResetCallback([](FactoryResetStage stage) {
+        switch (stage) {
+            case FactoryResetStage::START:
+                ledController->setSystemPattern(SystemPattern::FACTORY_RESET);
+                buzzerController->playChime(BuzzerChime::RESET_START);
+                break;
+            case FactoryResetStage::IN_PROGRESS:
+                ledController->setSystemPattern(SystemPattern::FACTORY_RESET_PROGRESS);
+                break;
+            case FactoryResetStage::COMPLETE:
+                ledController->setSystemPattern(SystemPattern::FACTORY_RESET_COMPLETE);
+                buzzerController->playChime(BuzzerChime::RESET_COMPLETE);
+                break;
+            case FactoryResetStage::FAILED:
+                ledController->setSystemPattern(SystemPattern::ERROR);
+                buzzerController->playChime(BuzzerChime::ERROR);
+                break;
+        }
     });
     
     // Initialize WiFi
     wifiSetup.begin();
     
-    // Wait for WiFi connection with timeout
+    // Wait for WiFi connection with timeout (2 minutes as per PRD)
     unsigned long startTime = millis();
-    while (!wifiSetup.isConnected() && millis() - startTime < 30000) {
+    while (!wifiSetup.isConnected() && millis() - startTime < 120000) {  // 2 minutes
         wifiSetup.handle();
         resetHandler.update();
         ledController->update();
-        delay(10);
+        buzzerController->update();
+        yield();  // Allow system tasks to run
+        
+        // Check for factory reset during setup
+        if (digitalRead(Config::FACTORY_RESET_BTN) == LOW) {
+            resetHandler.update();
+        }
     }
     
     if (!wifiSetup.isConnected()) {
         buzzerController->playChime(BuzzerChime::ERROR);
         ledController->setSystemPattern(SystemPattern::ERROR);
+        delay(2000);  // Show error for 2 seconds
+        ESP.restart();  // Restart if setup fails
         return;
     }
     
     // Show connection success
     ledController->setSystemPattern(SystemPattern::CONNECTED);
-    buzzerController->playChime(BuzzerChime::SUCCESS);
+    buzzerController->playChime(BuzzerChime::WIFI_CONNECTED);  // Specific chime for WiFi connection
     
     // Initialize MQTT
     mqttHandler.begin(wifiSetup.getDeviceID());
@@ -150,11 +178,13 @@ void setup() {
 #endif
         ledController->setSystemPattern(SystemPattern::ERROR);
         buzzerController->playChime(BuzzerChime::ERROR);
+        delay(1000);  // Give time for the error indication
+        ESP.restart();
         return;
     }
     
-    // Initialize alarm system
-    alarmController.begin();
+    // Initialize alarm system with LED and Buzzer controllers
+    alarmController.begin(ledController.get(), buzzerController.get());
     alarmController.setStateCallback(handleAlarmState);
     
     // Initialize tamper detection

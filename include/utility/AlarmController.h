@@ -1,5 +1,7 @@
 #pragma once
 #include "../Config.h"
+#include "LEDController.h"
+#include "BuzzerController.h"
 #include <functional>
 #include <Arduino.h>
 
@@ -21,7 +23,7 @@ public:
     };
 
     // Initialize the controller
-    void begin();
+    void begin(LEDController* led, BuzzerController* buzzer);
     void update();
 
     // State management
@@ -54,6 +56,8 @@ public:
 private:
     State currentState = State::DISARMED;
     Trigger currentTrigger = Trigger::NONE;
+    LEDController* ledController = nullptr;
+    BuzzerController* buzzerController = nullptr;
 
     // Event timers
     unsigned long motionStartTime = 0;

@@ -67,9 +67,20 @@ void BuzzerController::update() {
                 }
                 break;
                 
-            case BuzzerPattern::CONTINUOUS:
-                tone(2000, 1000);  // 2kHz continuous
-                patternDelay = 1000;
+            case BuzzerPattern::ALARM:
+                if (currentTime - lastUpdate >= 500) {
+                    if (alarmHigh) {
+                        ledcWriteTone(0, 2000);
+                    } else {
+                        ledcWriteTone(0, 1500);
+                    }
+                    alarmHigh = !alarmHigh;
+                    lastUpdate = currentTime;
+                }
+                break;
+            
+            default:
+                stop();
                 break;
         }
     }
@@ -78,55 +89,36 @@ void BuzzerController::update() {
 void BuzzerController::playPattern(BuzzerPattern pattern) {
     currentPattern = pattern;
     patternStep = 0;
-    lastUpdate = 0;
+    patternDelay = 0;
+    lastUpdate = millis();
     alarmHigh = false;
+    isPlaying = true;
 }
 
 void BuzzerController::playChime(BuzzerChime chime) {
     currentChime = chime;
-    patternStep = 0;
-    lastUpdate = 0;
-    
     switch (chime) {
         case BuzzerChime::SUCCESS:
-            tone(1800, 100);  // Low
-            delay(150);
-            tone(2000, 100);  // Mid
-            delay(150);
-            tone(2200, 100);  // High
+            currentPattern = BuzzerPattern::DOUBLE_BEEP;
             break;
-            
+        case BuzzerChime::WARNING:
+            currentPattern = BuzzerPattern::TRIPLE_BEEP;
+            break;
         case BuzzerChime::ERROR:
-            tone(2200, 100);  // High
-            delay(150);
-            tone(1800, 100);  // Low
-            break;
-            
-        case BuzzerChime::WIFI_CONNECTED:
-            tone(2000, 100);  // Mid
-            delay(100);
-            tone(2200, 200);  // High, longer
-            break;
-            
-        case BuzzerChime::RESET_START:
-            tone(2200, 50);   // Quick high beep
-            break;
-            
-        case BuzzerChime::RESET_COMPLETE:
-            playPattern(BuzzerPattern::FACTORY_RESET);
+            currentPattern = BuzzerPattern::ALARM;
             break;
     }
-}
-
-void BuzzerController::tone(uint16_t frequency, uint32_t duration) {
-    ledcChangeFrequency(0, frequency, 8);
-    ledcWrite(0, 128); // 50% duty cycle
-    patternDelay = duration;
+    playPattern(currentPattern);
 }
 
 void BuzzerController::stop() {
-    ledcWrite(0, 0);
     currentPattern = BuzzerPattern::OFF;
-    patternStep = 0;
+    ledcWrite(0, 0);
     isPlaying = false;
+}
+
+void BuzzerController::beep(unsigned int duration) {
+    ledcWriteTone(0, 2000);
+    patternDelay = duration;
+    lastUpdate = millis();
 }

@@ -13,34 +13,49 @@ void FactoryResetHandler::update() {
 
 void FactoryResetHandler::checkButton() {
     bool currentState = digitalRead(Config::FACTORY_RESET_BTN) == LOW;
+    unsigned long currentTime = millis();
     
     // Button just pressed
     if (currentState && !buttonPressed) {
         buttonPressed = true;
-        buttonPressStart = millis();
+        buttonPressStart = currentTime;
+        if (resetCallback) {
+            resetCallback(FactoryResetStage::START);
+        }
     }
     // Button released
     else if (!currentState && buttonPressed) {
         buttonPressed = false;
         buttonPressStart = 0;
+        if (resetCallback) {
+            resetCallback(FactoryResetStage::CANCELLED);
+        }
     }
-    // Check for long press
+    // Check for long press and provide feedback
     else if (buttonPressed) {
-        if (millis() - buttonPressStart >= RESET_HOLD_TIME) {
+        unsigned long pressDuration = currentTime - buttonPressStart;
+        if (pressDuration >= RESET_HOLD_TIME) {
             performReset();
+        } else {
+            resetCallback(FactoryResetStage::IN_PROGRESS);
         }
     }
 }
 
 void FactoryResetHandler::performReset() {
+    if (resetCallback) {
+        resetCallback(FactoryResetStage::IN_PROGRESS);
+    }
+
     Preferences prefs;
     prefs.begin("scout-config", false);
     prefs.clear();
     prefs.end();
     
     if (resetCallback) {
-        resetCallback();
+        resetCallback(FactoryResetStage::COMPLETE);
     }
     
+    delay(1000);  // Give time for the completion feedback
     ESP.restart();
 }

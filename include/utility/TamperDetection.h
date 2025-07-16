@@ -4,35 +4,12 @@
 
 class TamperDetection {
 public:
-    void begin() {
-        pinMode(Config::TAMPER_PIN, INPUT_PULLUP);
-        lastState = digitalRead(Config::TAMPER_PIN);
-    }
-    
-    void update() {
-        unsigned long currentTime = millis();
-        if (currentTime - lastDebounceTime > debounceDelay) {
-            int reading = digitalRead(Config::TAMPER_PIN);
-            
-            if (reading != lastState) {
-                lastDebounceTime = currentTime;
-                lastState = reading;
-                
-                if (tamperCallback) {
-                    tamperCallback(reading == LOW);
-                }
-            }
-        }
-    }
-    
-    bool isTampered() const {
-        return lastState == LOW;
-    }
+    void begin();
+    void update();
+    bool isTampered() const;
     
     using TamperCallback = std::function<void(bool)>;
-    void setTamperCallback(TamperCallback callback) {
-        tamperCallback = callback;
-    }
+    void setTamperCallback(TamperCallback callback);
     
 private:
     int lastState = HIGH;

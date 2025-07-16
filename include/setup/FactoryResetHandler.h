@@ -3,9 +3,17 @@
 #include <Arduino.h>
 #include <functional>
 
+enum class FactoryResetStage {
+    START,
+    IN_PROGRESS,
+    COMPLETE,
+    FAILED,
+    CANCELLED
+};
+
 class FactoryResetHandler {
 public:
-    using ResetCallback = std::function<void(void)>;
+    using ResetCallback = std::function<void(FactoryResetStage)>;
 
     void begin();
     void update();

@@ -44,6 +44,9 @@ const char* HTML_FORM = R"(
 )";
 
 void WiFiSetup::begin() {
+    // Initialize random seed from ESP32's random number generator
+    randomSeed(esp_random());
+    
     prefs.begin("scout-config");
     
     String ssid = prefs.getString(WIFI_SSID_KEY, "");
@@ -111,12 +114,10 @@ void WiFiSetup::handleSave() {
 }
 
 void WiFiSetup::generateDeviceID() {
-    uint8_t mac[6];
-    WiFi.macAddress(mac);
-    deviceID = String("Scout-");
+    deviceID = String("TheScout-");
+    // Generate 6 random digits
     for (int i = 0; i < 6; i++) {
-        if (mac[i] < 0x10) deviceID += "0";
-        deviceID += String(mac[i], HEX);
+        deviceID += String(random(0, 10));  // 0-9 for each digit
     }
 }
 

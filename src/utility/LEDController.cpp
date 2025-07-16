@@ -16,6 +16,8 @@ void LEDController::update() {
 }
 
 void LEDController::updateSystemLED(unsigned long currentTime) {
+    static uint8_t flashCount = 0;
+    
     switch (systemPattern) {
         case LEDPattern::OFF:
             digitalWrite(Config::SYSTEM_LED, LOW);
@@ -45,6 +47,22 @@ void LEDController::updateSystemLED(unsigned long currentTime) {
             // For factory reset indication
             if (currentTime - systemLastUpdate >= 100) {
                 systemState = !systemState;
+                digitalWrite(Config::SYSTEM_LED, systemState);
+                systemLastUpdate = currentTime;
+            }
+            break;
+            
+        case LEDPattern::FLASH_3X:
+            if (currentTime - systemLastUpdate >= 200) {
+                systemState = !systemState;
+                if (!systemState) {  // On falling edge
+                    flashCount++;
+                    if (flashCount >= 6) {  // 3 complete cycles
+                        systemPattern = LEDPattern::OFF;
+                        flashCount = 0;
+                        break;
+                    }
+                }
                 digitalWrite(Config::SYSTEM_LED, systemState);
                 systemLastUpdate = currentTime;
             }
@@ -85,7 +103,7 @@ void LEDController::setSystemPattern(SystemPattern pattern) {
             systemPattern = LEDPattern::BLINK_SLOW;
             break;
         case SystemPattern::CONNECTED:
-            systemPattern = LEDPattern::ON;
+            systemPattern = LEDPattern::FLASH_3X;  // Flash 3 times for successful connection
             break;
         case SystemPattern::ERROR:
             systemPattern = LEDPattern::BLINK_FAST;

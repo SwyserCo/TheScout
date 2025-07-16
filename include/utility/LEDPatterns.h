@@ -5,19 +5,26 @@ enum class LEDPattern {
     ON,
     BLINK_SLOW,
     BLINK_FAST,
-    PULSE
+    PULSE,
+    FLASH_3X    // Flash 3 times then stop
 };
 
 enum class SystemPattern {
     OFF,
+    STARTUP,
     CONNECTING,
     CONNECTED,
     ERROR,
-    FACTORY_RESET
+    NORMAL,
+    ALARM,
+    FACTORY_RESET,
+    FACTORY_RESET_PROGRESS,
+    FACTORY_RESET_COMPLETE
 };
 
 enum class ActivityPattern {
     OFF,
     ARMED,
-    ALARM
+    ALARM,
+    MOTION
 };

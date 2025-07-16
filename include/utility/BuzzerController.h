@@ -10,6 +10,7 @@ public:
     void playPattern(BuzzerPattern pattern);
     void playChime(BuzzerChime chime);
     void stop();
+    void tone(uint16_t frequency, uint32_t duration);
 
 private:
     void updatePattern();
