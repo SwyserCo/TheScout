@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "Config.h"
 
 enum class SystemLEDState : uint8_t {
     OFF = 0,
@@ -28,6 +29,6 @@ private:
     ActivityLEDState activityState = ActivityLEDState::OFF;
     unsigned long lastFlashTime = 0;
     bool flashOn = false;
-    const uint8_t systemLEDPin = 2; // Example GPIO
-    const uint8_t activityLEDPin = 3; // Example GPIO
+    const uint8_t systemLEDPin = PIN_SYSTEM_LED;
+    const uint8_t activityLEDPin = PIN_ACTIVITY_LED;
 };

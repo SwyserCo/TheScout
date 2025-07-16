@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "Config.h"
 
 enum class RelayState : uint8_t {
     OFF = 0,
@@ -17,6 +18,6 @@ public:
 
 private:
     RelayState state = RelayState::OFF;
-    uint8_t relayPin = 5; // Example GPIO, update as needed
+    uint8_t relayPin = PIN_RELAY;
     unsigned long lastToggleTime = 0;
 };

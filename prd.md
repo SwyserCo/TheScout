@@ -16,21 +16,23 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 ## User Stories
 
 ### User Story 1: Wi-Fi Setup
-**As a homeowner**, I want to easily connect The Scout to my Wi-Fi so I can start using it without technical knowledge.
+**As a homeowner**, I want to easily set up The Scout for use by connecting it to my Wi-Fi so I can start using it without technical knowledge.
 
 **Acceptance Criteria:**
-- Device enters AP mode if no Wi-Fi credentials are stored.
+- Device enters AP mode if no Wi-Fi credentials are stored in Preferences
 - Captive portal shows a welcome screen with a setup button.
 - User enters SSID and password.
 - Confirmation page is shown after submission.
+- The credentials are stored using the Preferences Library.
 - System LED flashes red during connection, green 3x on success.
 - Buzzer plays chime on successful connection.
+- Once connected, create a unique DeviceID starting with "TheScout-" and then a unique 6 digit number.
 
 ### User Story 2: MQTT Integration
 **As a Home Assistant user**, I want The Scout to auto-discover and publish sensor data so I can use it in automations.
 
 **Acceptance Criteria:**
-- Device connects to MQTT broker.
+- Device connects to MQTT broker mentioned below.
 - All sensors appear in Home Assistant via auto-discovery.
 - Sensor data updates in real time.
 
@@ -55,12 +57,12 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 
 **Acceptance Criteria:**
 - Holding IO02 button for 5 seconds flashes red LED.
-- Wi-Fi configuration is erased.
+- Wi-Fi configuration is erased using PReferencesAPI.
 - Device reboots into setup mode.
 
 ## Functional Requirements
 - WiFiManager setup with captive portal and Preferences storage.
-- Unique device name generation starting with `TheScout-XXXX`.
+- Unique device name generation starting with `TheScout-` and stored useing PreferencesAPI.
 - MQTT connection and auto-discovery for all sensors.
 - Sensor publishing:
   - LD2420: presence detection
@@ -68,7 +70,6 @@ The Scout is a compact, sensor-rich device designed for home security and automa
   - SPL microphone: sound detection
   - BME280: temperature, humidity, pressure
   - VEML7700: ambient light
-  - Battery level
 - Alarm logic:
   - Trigger only when armed
   - Accelerometer: movement > 3s
@@ -78,8 +79,12 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - LED and buzzer feedback:
   - System LED: red (connecting), green 3x (connected), red (reset)
   - Activity LED: on (armed), flashing (alarm)
-  - Buzzer: chimes for success, failure, timeout
-- Factory reset via IO02 button.
+  - Buzzer: chimes for success, failure, timeout of wifi connection
+- Factory reset when Factory Reset Button is held in for 5 seconds
+  - SystemLED flashes until 5 seconds is reached
+  - After 5 seconds, Wifi credentials and Unique Device Name are also cleared using PreferencesAPI
+  - the buzzer plays a chime to signal the the device has been reset
+
 
 ## Non-Goals
 
@@ -112,6 +117,7 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 
 ## Success Metrics
 
+- Sensors should be driven using Pin Map below
 - Setup time < 2 minutes
 - MQTT discovery within 10 seconds
 - Sensor accuracy ±5%
@@ -119,9 +125,35 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - Relay toggles within 500ms
 - 0 false alarms during 24h idle test
 - 100% feedback accuracy for LEDs and buzzer
+- Alarm state be latched
+- sensor thresholds be configurable via MQTT
 
-## Open Questions
+## Pin Mapping
+- Please use the following pins.
 
-- Should alarm state be latched or auto-reset?
-- Should sensor thresholds be configurable via MQTT?
-- Should relay support timed activation (e.g., auto-off after 5s)?
+| Function                  | GPIO Pin |
+|---------------------------|----------|
+| Factory Reset Button      | IO02     |
+| LD2420 RX                 | IO15     |
+| LD2420 TX                 | IO16     |
+| I2C SDA                   | IO17     |
+| I2C SCL                   | IO18     |
+| USB D+                    | IO19     |
+| USB D-                    | IO20     |
+| System LED                | IO09     |
+| Accelerometer Interrupt   | IO10     |
+| LD2420 Interrupt          | IO11     |
+| Relay                     | IO12     |
+| Charged Status            | IO14     |
+| Power Good                | IO21     |
+| Activity LED              | IO48     |
+| SPL Microphone            | IO41     |
+| Buzzer                    | IO40     |
+
+
+## MQTT Broker
+- MQTT_BROKER      "192.168.40.6"
+- MQTT_PORT        1883
+- MQTT_USER        "mqtt-user"
+- MQTT_PASSWORD    "##DikTrill45"
+- MQTT_CLIENT_ID   *The Device Name that was created on wifi connect*

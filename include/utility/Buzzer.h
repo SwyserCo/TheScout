@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "Config.h"
 
 enum class BuzzerChime : uint8_t {
     NONE = 0,
@@ -18,7 +19,7 @@ public:
 private:
     BuzzerChime currentChime = BuzzerChime::NONE;
     unsigned long chimeStartTime = 0;
-    const uint8_t buzzerPin = 4; // Example GPIO
+    const uint8_t buzzerPin = PIN_BUZZER;
     void playSuccessChime();
     void playFailureChime();
     void playTimeoutChime();
