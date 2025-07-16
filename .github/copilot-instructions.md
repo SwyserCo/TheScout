@@ -10,7 +10,7 @@ These instructions define how GitHub Copilot should assist with this project. Th
 - **Language**: C++ (Arduino Framework)
 - **Framework**: Arduino
 - **Toolchain**: PlatformIO with VSCode
-- **Target MCU**: ESP32-S3 (or compatible)
+- **Target MCU**: ESP32-S3
 
 ---
 
@@ -34,26 +34,46 @@ These instructions define how GitHub Copilot should assist with this project. Th
 Use this structure as a guide when creating or updating files:
 
 src/
-  main.cpp
-  components/
-    SensorManager.cpp
-    SensorManager.h
-    LEDController.cpp
-    LEDController.h
-    WiFiManager.cpp
-    WiFiManager.h
-  config/
+    main.cpp
+    sensors/
+        SensorManager.cpp
+        BME280.cpp
+        VEML7700.cpp
+        LD2402.cpp
+        Microphone.ccp
+        Relay.cpp
+    utility
+        MQTTHandler.cpp
+        LEDController.cpp
+        Buzzer.cpp
+        LEDController.cpp
+        TamperingProtection.cpp
+    setup
+        WiFiManager.cpp
+        FactoryResetHandler.cpp
+config/
     Config.h
 include/
-  guardian/
-    SensorManager.h
-    LEDController.h
-    WiFiManager.h
-lib/
-  third_party_libs/
+    sensors/
+        SensorManager.h
+        BME280.h
+        VEML7700.h
+        LD2402.h
+        Microphone.h
+        Relay.h
+    utility
+        MQTTHandler.h
+        LEDController.h
+        Buzzer.h
+        LEDController.h
+        TamperingProtection.h
+    setup
+        WiFiManager.h
+        FactoryResetHandler.h
+third_party_libs/
 test/
-  unit/
-  integration/
+unit/
+integration/
 
 ---
 
@@ -68,6 +88,7 @@ test/
 - Use `Preferences` for storing Wi-Fi credentials and device settings.
 - Use `millis()`-based timing for periodic tasks.
 - Use `#ifdef DEBUG` blocks for conditional logging.
+- Use `#pragma once` where needed.
 
 ---
 
