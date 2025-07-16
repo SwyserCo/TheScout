@@ -1,81 +1,82 @@
+
+
+// Main application for The Scout (ESP32-S3)
 #include <Arduino.h>
-
-// setup includes
-#include "setup/MQTTClientHandler.h"
 #include "setup/WiFiManager.h"
+#include "utility/MQTTHandler.h"
 
-// utility includes
-#include "utility/FactoryResetHandler.h"
-#include "utility/StatusLEDController.h"
-#include "utility/BuzzerController.h"
+MQTTHandler mqttHandler;
+#include "sensors/SensorManager.h"
+#include "utility/LEDController.h"
+#include "utility/Buzzer.h"
+#include "sensors/Relay.h"
+#include "utility/TamperingProtection.h"
+#include "setup/FactoryResetHandler.h"
+#include "sensors/BME280.h"
+#include "sensors/VEML7700.h"
+#include "sensors/LD2420.h"
+#include "sensors/Microphone.h"
 
-// sensor includes
-#include "sensors/VEML7700Sensor.h"
-#include "sensors/BME280Sensor.h"
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include "utility/MQTTClientWrapper.h"
+
 
 WiFiManager wifiManager;
-StatusLEDController ledController;
-FactoryResetHandler resetHandler(wifiManager, ledController);
-VEML7700Sensor lightSensor;
-BME280Sensor bmeSensor;
-BuzzerController buzzer;
+SensorManager sensorManager;
+LEDController ledController;
+Buzzer buzzer;
+Relay relay;
+TamperingProtection tamperingProtection;
+FactoryResetHandler factoryResetHandler;
 
-MQTTClientHandler* mqttHandler;
-
-unsigned long lastPublish = 0;
+WiFiClient espClient;
+MQTTClientWrapper mqttClient(espClient);
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial);
-  Serial.println("Start!");
-
-  buzzer.begin();
   ledController.begin();
+  buzzer.begin();
+  factoryResetHandler.begin();
   wifiManager.begin();
-  resetHandler.begin();  // ✅ Important: sets pinMode for the button
+  sensorManager.begin();
+  relay.begin();
+  tamperingProtection.begin();
+  tamperingProtection.setMQTTHandler(&mqttHandler);
 
-  Wire.begin(17, 18);  // SDA = IO17, SCL = IO18
-
-  const char* hostname = wifiManager.getHostname();
-  mqttHandler = new MQTTClientHandler("192.168.40.6", "mqtt-user", "##DikTrill45", hostname);
-  mqttHandler->begin();
-
-  if (!lightSensor.begin()) {
-    Serial.println("VEML7700 not found");
+  // Connect to WiFi (replace with WiFiManager logic)
+  WiFi.begin("YOUR_SSID", "YOUR_PASSWORD");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(100);
+    Serial.print(".");
   }
+  Serial.println("\nWiFi connected");
 
-  if (!bmeSensor.begin()) {
-    Serial.println("BME280 not found");
-  }
+  // Setup MQTT
+  mqttClient.begin("YOUR_MQTT_BROKER", 1883); // Replace with actual broker and port
+  mqttClient.subscribeRelay(&relay);
+
+  // Link SensorManager to MQTTHandler
+  // If using MQTTHandler, uncomment and use:
+  // mqttHandler.setSensorManagerPtr(&sensorManager);
 }
 
 void loop() {
-  resetHandler.update();
-  mqttHandler->loop();
+  factoryResetHandler.handle();
+  wifiManager.handle();
+  sensorManager.handle();
+  relay.handle();
+  tamperingProtection.handle();
+  ledController.handle();
+  buzzer.handle();
+  mqttClient.loop();
+  // ...existing code...
 
-  unsigned long now = millis();
-  if (now - lastPublish > 10000) {
-    if (lightSensor.begin()) {
-      float lux = lightSensor.readLux();
-      mqttHandler->publishLux(lux);
-      Serial.print("Published lux: ");
-      Serial.println(lux);
-    }
-
-    float temperature, humidity, pressure;
-    bmeSensor.readValues(temperature, humidity, pressure);
-
-    mqttHandler->publishTemperature(temperature);
-    mqttHandler->publishHumidity(humidity);
-    mqttHandler->publishPressure(pressure);
-
-    Serial.print("Published temperature: ");
-    Serial.println(temperature);
-    Serial.print("Published humidity: ");
-    Serial.println(humidity);
-    Serial.print("Published pressure: ");
-    Serial.println(pressure);
-
-    lastPublish = now;
+  // Example: publish sensor data every second
+  static unsigned long lastPublish = 0;
+  if (millis() - lastPublish > 1000) {
+    lastPublish = millis();
+    // If using MQTTHandler, uncomment and use:
+    // mqttHandler.publishSensorData();
   }
 }

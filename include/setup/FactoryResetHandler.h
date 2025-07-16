@@ -1,6 +1,6 @@
 #pragma once
 
-class WiFiManager {
+class FactoryResetHandler {
 public:
     void begin();
     void handle();
