@@ -93,6 +93,7 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - Cloud-based remote access
 - Encrypted MQTT communication
 - Custom Home Assistant dashboards
+- Unit tests
 
 ## Design Considerations
 
@@ -110,10 +111,13 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 
 ## Technical Considerations
 
+- It's best practice to separate declarations in header files (.h) from implementations in source files (.cpp)
+- Make sure you look at .github folder .md files for more insights
 - ESP32-S3 is single-threaded; avoid blocking operations.
 - Device is USB-powered; battery optimization not required.
 - Use best-in-class libraries for MQTT, WiFiManager, Preferences.
 - Sensor polling and debounce logic must be efficient.
+- Update the platform.ini file to contain all the used external libraries
 
 ## Success Metrics
 

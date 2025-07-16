@@ -1,10 +1,25 @@
 #pragma once
-#include "Config.h"
+#include "../Config.h"
+#include <Arduino.h>
+#include <functional>
 
 class FactoryResetHandler {
 public:
+    using ResetCallback = std::function<void(void)>;
+
     void begin();
-    void handle();
+    void update();
+    
+    void setResetCallback(ResetCallback callback) {
+        resetCallback = callback;
+    }
+
 private:
-    const uint8_t resetBtnPin = PIN_FACTORY_RESET_BTN;
+    static constexpr unsigned long RESET_HOLD_TIME = 5000;  // 5 seconds
+    unsigned long buttonPressStart = 0;
+    bool buttonPressed = false;
+    ResetCallback resetCallback;
+
+    void checkButton();
+    void performReset();
 };

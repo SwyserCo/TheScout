@@ -1,34 +1,25 @@
 #pragma once
-
+#include "../Config.h"
+#include "LEDPatterns.h"
 #include <Arduino.h>
-#include "Config.h"
-
-enum class SystemLEDState : uint8_t {
-    OFF = 0,
-    RED = 1,
-    GREEN = 2,
-    FLASHING_RED = 3,
-    FLASHING_GREEN = 4
-};
-
-enum class ActivityLEDState : uint8_t {
-    OFF = 0,
-    ON = 1,
-    FLASHING = 2
-};
 
 class LEDController {
 public:
     void begin();
-    void handle();
-    void setSystemLED(SystemLEDState state);
-    void setActivityLED(ActivityLEDState state);
+    void update();
+    
+    // LED control
+    void setSystemPattern(SystemPattern pattern);
+    void setActivityPattern(ActivityPattern pattern);
 
 private:
-    SystemLEDState systemState = SystemLEDState::OFF;
-    ActivityLEDState activityState = ActivityLEDState::OFF;
-    unsigned long lastFlashTime = 0;
-    bool flashOn = false;
-    const uint8_t systemLEDPin = PIN_SYSTEM_LED;
-    const uint8_t activityLEDPin = PIN_ACTIVITY_LED;
+    void updateSystemLED(unsigned long currentTime);
+    void updateActivityLED(unsigned long currentTime);
+
+    LEDPattern systemPattern = LEDPattern::OFF;
+    LEDPattern activityPattern = LEDPattern::OFF;
+    unsigned long systemLastUpdate = 0;
+    unsigned long activityLastUpdate = 0;
+    bool systemState = false;
+    bool activityState = false;
 };
