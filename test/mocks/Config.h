@@ -10,7 +10,6 @@ namespace Config {
     // Pin Configuration
     constexpr uint8_t FACTORY_RESET_BTN = 2;    // IO02
     constexpr uint8_t SYSTEM_LED = 9;           // IO09
-    constexpr uint8_t ACCEL_INT = 10;           // IO10
     constexpr uint8_t LD2420_INT = 11;          // IO11
     constexpr uint8_t RELAY_PIN = 12;           // IO12
     constexpr uint8_t CHARGED_STATUS = 14;      // IO14

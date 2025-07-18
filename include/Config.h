@@ -10,8 +10,8 @@
 namespace Config {
     // Pin Configuration
     constexpr uint8_t RESET_BUTTON_PIN = 2;    // IO02 (Factory Reset button)
-    constexpr uint8_t STATUS_LED_PIN = 9;      // IO09 (Also used as system LED)
-    constexpr uint8_t ACCEL_INT = 10;          // IO10
+    constexpr uint8_t STATUS_LED_PIN = 3;      // IO09 (Also used as system LED)
+    constexpr uint8_t TAMPER_PIN = 9;          // IO10
     constexpr uint8_t LD2420_INT = 11;         // IO11
     constexpr uint8_t RELAY_PIN = 12;          // IO12
     constexpr uint8_t CHARGED_STATUS = 14;     // IO14
@@ -21,7 +21,7 @@ namespace Config {
     constexpr uint8_t I2C_SCL_PIN = 18;       // IO18
     constexpr uint8_t POWER_GOOD = 21;        // IO21
     constexpr uint8_t SPL_MIC_PIN = 41;       // IO41
-    constexpr uint8_t ACTIVITY_LED = 48;      // IO48
+    constexpr uint8_t ACTIVITY_LED = 45;      // IO48
     constexpr uint8_t BUZZER_PIN = 40;        // IO40
 
     // Aliases for shared pins (grouped with pin definitions for clarity)
@@ -39,9 +39,6 @@ namespace Config {
     constexpr uint16_t MIC_SAMPLE_RATE = 16000;
     constexpr uint8_t MIC_SAMPLES = 128;
 
-    // Tamper Detection
-    constexpr uint8_t TAMPER_PIN = 35;
-
     // MQTT Configuration
 #ifndef MQTT_SERVER
     constexpr char MQTT_SERVER[] = "192.168.40.6";  // Default value, override in build flags
@@ -57,11 +54,16 @@ namespace Config {
     constexpr uint16_t MQTT_RECONNECT_DELAY = 5000;
 
     // Device Settings
-    constexpr uint32_t DEVICE_CHECK_INTERVAL = 5000;    // 5 seconds
-    constexpr uint32_t SENSOR_READ_INTERVAL = 1000;     // 1 second
-    constexpr uint32_t STATUS_UPDATE_INTERVAL = 30000;  // 30 seconds
-    constexpr uint32_t WATCHDOG_TIMEOUT = 30000;        // 30 seconds
-    constexpr uint32_t WIFI_SETUP_TIMEOUT = 120000;     // 2 minutes
+    constexpr uint32_t DEVICE_CHECK_INTERVAL = 1000;    // 1 second
+    constexpr uint32_t SENSOR_READ_INTERVAL = 500;      // 0.5 seconds
+    constexpr uint32_t STATUS_UPDATE_INTERVAL = 5000;   // 5 seconds
+    constexpr uint32_t WATCHDOG_TIMEOUT = 10000;        // 10 seconds
+    constexpr uint32_t WIFI_SETUP_TIMEOUT = 30000;      // 30 seconds
+    
+    // Network Task Settings
+    constexpr uint32_t DNS_CHECK_INTERVAL = 10;         // 10ms between DNS checks
+    constexpr uint32_t WEBSERVER_CHECK_INTERVAL = 10;   // 10ms between web server checks
+    constexpr uint32_t NETWORK_YIELD_INTERVAL = 2;      // 2ms yield time
     constexpr uint8_t SENSOR_INIT_RETRIES = 3;         // Number of retries for sensor initialization
 
     // Storage Keys
