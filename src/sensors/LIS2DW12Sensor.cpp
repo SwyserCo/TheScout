@@ -63,6 +63,9 @@ void LIS2DW12Sensor::readSensor(DynamicJsonDocument& doc) {
         _accelY = rawY * SCALE_FACTOR;
         _accelZ = rawZ * SCALE_FACTOR;
         
+        // Check for motion
+        checkTamper();
+        
         _lastReading = currentTime;
     }
     
@@ -71,6 +74,17 @@ void LIS2DW12Sensor::readSensor(DynamicJsonDocument& doc) {
     doc["accel_z"] = _accelZ;
     doc["tamper"] = _tamperDetected;
     doc["motion_detected"] = _tamperDetected;
+    
+    // Add baseline and deviation info for debugging
+    if (_baselineSet) {
+        float deviation = sqrt(pow(_accelX - _baselineX, 2) + pow(_accelY - _baselineY, 2) + pow(_accelZ - _baselineZ, 2));
+        
+        #ifdef DEBUG
+        Serial.printf("[LIS2DW12] Current acceleration: X=%.3f, Y=%.3f, Z=%.3f (g)\n", _accelX, _accelY, _accelZ);
+        Serial.printf("[LIS2DW12] Baseline: X=%.3f, Y=%.3f, Z=%.3f (g)\n", _baselineX, _baselineY, _baselineZ);
+        Serial.printf("[LIS2DW12] Deviation: %.3f (threshold: %.3f)\n", deviation, _tamperThreshold);
+        #endif
+    }
 }
 
 bool LIS2DW12Sensor::checkTamper() {
@@ -88,21 +102,24 @@ bool LIS2DW12Sensor::checkTamper() {
     if (deviation > _tamperThreshold) {
         if (!_tamperDetected) {
             _tamperStartTime = currentTime;
+            Serial.printf("Motion started: deviation=%.3fg (threshold=%.3fg)\n", deviation, _tamperThreshold);
         }
         
         // Check if tamper condition persists for required duration
         if (currentTime - _tamperStartTime >= TAMPER_DURATION) {
             _tamperDetected = true;
-            Serial.println("Tamper detected!");
             return true;
         }
     } else {
-        // Reset tamper detection if below threshold
-        _tamperDetected = false;
-        _tamperStartTime = 0;
+        // Reset tamper detection if below threshold for some time
+        if (_tamperDetected && currentTime - _tamperStartTime >= (TAMPER_DURATION * 5)) {
+            _tamperDetected = false;
+            _tamperStartTime = 0;
+            Serial.println("Motion ended");
+        }
     }
     
-    return false;
+    return _tamperDetected;
 }
 
 void LIS2DW12Sensor::update() {

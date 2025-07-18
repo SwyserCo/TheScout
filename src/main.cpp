@@ -313,11 +313,14 @@ void publishSensorData() {
     // Motion/tamper data
     if (accelerometer.isConnected()) {
         accelerometer.readSensor(doc);
-        Serial.printf("LIS2DW12TR: X=%.2fg, Y=%.2fg, Z=%.2fg, Motion=%s\n", 
+        float deviation = doc["deviation"].as<float>();
+        float threshold = doc["threshold"].as<float>();
+        Serial.printf("LIS2DW12TR: X=%.2fg, Y=%.2fg, Z=%.2fg, Motion=%s, Dev=%.3fg/%.3fg\n", 
                       doc["accel_x"].as<float>(), 
                       doc["accel_y"].as<float>(), 
                       doc["accel_z"].as<float>(),
-                      doc["motion_detected"].as<bool>() ? "YES" : "NO");
+                      doc["motion_detected"].as<bool>() ? "YES" : "NO",
+                      deviation, threshold);
         
         if (mqtt.isConnected()) {
             mqtt.publishSensorData("motion", doc);
@@ -330,9 +333,12 @@ void publishSensorData() {
     // Presence data
     if (ld2420.isConnected()) {
         ld2420.readSensor(doc);
-        Serial.printf("LD2420: Presence=%s, Distance=%.1fm\n", 
+        Serial.printf("LD2420: Presence=%s, Distance=%.1fm, Strength=%d, Moving=%s, Static=%s\n", 
                       doc["presence"].as<bool>() ? "YES" : "NO",
-                      doc["distance"].as<float>());
+                      doc["distance"].as<float>(),
+                      doc["strength"].as<int>(),
+                      doc["moving_target"].as<bool>() ? "YES" : "NO",
+                      doc["static_target"].as<bool>() ? "YES" : "NO");
         
         if (mqtt.isConnected()) {
             mqtt.publishSensorData("presence", doc);
