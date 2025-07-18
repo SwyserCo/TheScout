@@ -1,37 +1,51 @@
 #include "sensors/VEML7700Sensor.h"
+#include "Config.h"
+
+VEML7700Sensor::VEML7700Sensor() : _connected(false), _lastReading(0), _lux(0) {
+}
 
 bool VEML7700Sensor::begin() {
-    if (!veml.begin()) {
-        lastError = "Could not find VEML7700 sensor";
-        return false;
+    _connected = _veml.begin();
+    
+    if (_connected) {
+        // Configure sensor for optimal performance
+        _veml.setGain(VEML7700_GAIN_1);
+        _veml.setIntegrationTime(VEML7700_IT_100MS);
+        
+        Serial.println("VEML7700 sensor initialized");
+    } else {
+        Serial.println("VEML7700 sensor not found");
     }
     
-    // Configure for indoor monitoring
-    veml.setGain(VEML7700_GAIN_1_8);
-    veml.setIntegrationTime(VEML7700_IT_100MS);
-    
-    initialized = true;
-    return true;
+    return _connected;
 }
 
-bool VEML7700Sensor::read() {
-    if (!initialized) {
-        lastError = "Sensor not initialized";
-        return false;
+bool VEML7700Sensor::isConnected() const {
+    return _connected;
+}
+
+void VEML7700Sensor::readSensor(DynamicJsonDocument& doc) {
+    if (!_connected) return;
+    
+    uint32_t currentTime = millis();
+    if (currentTime - _lastReading >= READING_INTERVAL) {
+        _lux = _veml.readLux();
+        _lastReading = currentTime;
     }
     
-    lux = veml.readLux();
-    white = veml.readWhite();
-    raw = veml.readALS();
+    doc["illuminance"] = _lux;
+    doc["lux"] = _lux;
+    doc["als"] = _veml.readALS();
+}
+
+float VEML7700Sensor::getLux() {
+    if (!_connected) return 0.0;
     
-    notifyUpdate();
-    return true;
-}
-
-bool VEML7700Sensor::isReady() const {
-    return initialized;
-}
-
-const char* VEML7700Sensor::getLastError() const {
-    return lastError;
+    uint32_t currentTime = millis();
+    if (currentTime - _lastReading >= READING_INTERVAL) {
+        _lux = _veml.readLux();
+        _lastReading = currentTime;
+    }
+    
+    return _lux;
 }

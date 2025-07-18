@@ -20,7 +20,8 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 
 **Acceptance Criteria:**
 - Device enters AP mode if no Wi-Fi credentials are stored in Preferences
-- Captive portal shows a welcome screen with a setup button.
+- If user connects to AP with a phone, Captive Portal open automatically.
+- User is presented with a page that show "Guardian Security System" as a heading and "The Scout" as a main heading. The page also shows the user a short 3 to 5 sentence introduction on what this page is for.
 - User enters SSID and password.
 - Confirmation page is shown after submission.
 - The credentials are stored using the Preferences Library.
@@ -37,13 +38,16 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - Sensor data updates in real time.
 
 ### User Story 3: Alarm Logic
-**As a homeowner**, I want The Scout to trigger an alarm when tampering, sound, or presence is detected while armed.
+**As a homeowner**, I want The Scout to trigger an alarm when tampering, sound, or presence is detected while alarm is armed.
 
 **Acceptance Criteria:**
 - Device subscribes to MQTT topic for arming/disarming.
 - Alarm triggers only when armed.
 - Alarm state is published to MQTT.
 - Activity LED flashes when alarm is triggered.
+- Buzzer plays a siren chime when alarm is triggered.
+- Buzzer stops when alarm is silenced, but LED keeps flashing.
+- LED and Buzzer stops when alarm is disarmed.
 
 ### User Story 4: Relay Control
 **As a smart home enthusiast**, I want to control the relay from Home Assistant to automate dumb devices.
@@ -56,8 +60,8 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 **As a user**, I want to reset the device to factory settings using a physical button.
 
 **Acceptance Criteria:**
-- Holding IO02 button for 5 seconds flashes red LED.
-- Wi-Fi configuration is erased using PReferencesAPI.
+- Holding IO02 button for 5 seconds flashes System LED and plays a short chime.
+- Wi-Fi configuration is erased using PreferencesAPI.
 - Device reboots into setup mode.
 
 ## Functional Requirements

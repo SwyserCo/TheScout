@@ -1,25 +1,33 @@
 #pragma once
-#include "../Config.h"
-#include "LEDPatterns.h"
+
 #include <Arduino.h>
+
+enum class LEDState {
+    OFF,
+    ON,
+    BLINK,
+    FAST_BLINK,
+    PULSE
+};
 
 class LEDController {
 public:
+    LEDController(uint8_t pin);
     void begin();
+    void setState(LEDState state);
     void update();
+    void flashPattern(uint8_t count, uint32_t duration = 200);
+    void setBlinkInterval(uint32_t interval);
     
-    // LED control
-    void setSystemPattern(SystemPattern pattern);
-    void setActivityPattern(ActivityPattern pattern);
-
 private:
-    void updateSystemLED(unsigned long currentTime);
-    void updateActivityLED(unsigned long currentTime);
-
-    LEDPattern systemPattern = LEDPattern::OFF;
-    LEDPattern activityPattern = LEDPattern::OFF;
-    unsigned long systemLastUpdate = 0;
-    unsigned long activityLastUpdate = 0;
-    bool systemState = false;
-    bool activityState = false;
+    uint8_t _pin;
+    LEDState _state;
+    bool _ledOn;
+    uint32_t _lastUpdate;
+    uint32_t _blinkInterval;
+    uint8_t _flashCount;
+    uint8_t _flashRemaining;
+    uint32_t _flashDuration;
+    uint32_t _flashStart;
+    bool _flashActive;
 };

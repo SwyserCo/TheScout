@@ -1,59 +1,50 @@
 #pragma once
-#include "../Config.h"
+
+#include <Arduino.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <ArduinoJson.h>
-#include <string>
-#include <functional>
-#include <cstdint>
 
 class MQTTHandler {
 public:
-    using CommandCallback = std::function<void(const JsonDocument&)>;
-    using ThresholdsCallback = std::function<void(const JsonDocument&)>;
-    
     MQTTHandler();
     void begin(const String& deviceId);
-    void update();
+    void loop();
+    bool isConnected() const;
     
-    // Publishing functions
-    bool publishStatus(const char* status);
-    bool publishMotion(uint8_t presence, uint16_t distance);
-    bool publishEnvironment(float temp, float humidity, float pressure);
-    bool publishLight(float lux);
-    bool publishSound(float rms, float peak);
-    bool publishTamper(bool tampered);
-    bool publishAlarm(bool triggered, int reason);
+    // Publishing methods
+    void publishSensorData(const String& sensor, const DynamicJsonDocument& data);
+    void publishAlarmState(const String& state);
+    void publishDeviceState(const String& state);
+    void publishRelayState(bool state);
     
-    // Command handling
-    void setCommandCallback(CommandCallback callback);
-    void setThresholdsCallback(ThresholdsCallback callback);
-
-private:
-    WiFiClient espClient;
-    PubSubClient client;
-    String deviceId;
-    CommandCallback commandCallback;
-    ThresholdsCallback thresholdsCallback;
-    unsigned long lastReconnectAttempt;
-    
-    // Topics
-    String statusTopic;
-    String motionTopic;
-    String environmentTopic;
-    String lightTopic;
-    String soundTopic;
-    String tamperTopic;
-    String commandTopic;
-    String responseTopic;
-    String thresholdsTopic;
-    String thresholdsSetTopic;
-    String alarmTopic;
-    
-    // Helper functions
-    void setupTopics();
-    void handleCallback(char* topic, uint8_t* payload, unsigned int length);
-    bool publishJson(const char* topic, JsonDocument& doc);
-    bool reconnect();
+    // Home Assistant auto-discovery
     void publishDiscoveryConfig();
+    
+    // Subscription callback
+    void setAlarmCallback(std::function<void(const String&)> callback);
+    void setRelayCallback(std::function<void(bool)> callback);
+    void setThresholdCallback(std::function<void(const String&, float)> callback);
+    
+private:
+    WiFiClient _wifiClient;
+    PubSubClient _client;
+    String _deviceId;
+    String _baseTopic;
+    uint32_t _lastReconnectAttempt;
+    
+    std::function<void(const String&)> _alarmCallback;
+    std::function<void(bool)> _relayCallback;
+    std::function<void(const String&, float)> _thresholdCallback;
+    
+    bool reconnect();
+    void onMessage(char* topic, byte* payload, unsigned int length);
+    void publishDiscoveryDevice(const String& component, const String& name, const String& deviceClass = "");
+    void publishDiscoveryBinarySensor(const String& name, const String& deviceClass, const String& stateTopic);
+    void publishDiscoverySensor(const String& name, const String& deviceClass, const String& stateTopic, const String& unit = "");
+    void publishDiscoverySwitch(const String& name, const String& stateTopic, const String& commandTopic);
+    void publishDiscoveryAlarm(const String& name, const String& stateTopic, const String& commandTopic);
+    
+    static void staticMessageCallback(char* topic, byte* payload, unsigned int length);
+    static MQTTHandler* instance;
 };

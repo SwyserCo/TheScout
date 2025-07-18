@@ -1,394 +1,547 @@
 
 #include "Config.h"
-#include "sensors/SensorManager.h"
+#include "setup/WiFiManager.h"
 #include "utility/LEDController.h"
-#include "utility/BuzzerController.h"
+#include "utility/Buzzer.h"
 #include "utility/MQTTHandler.h"
-#include "utility/TamperDetection.h"
-#include "utility/AlarmController.h"
-#include "setup/FactoryResetHandler.h"
-#include "WiFiSetup.h"
-#include "esp_task_wdt.h"
+#include "utility/AlarmSystem.h"
+#include "sensors/BME280Sensor.h"
+#include "sensors/VEML7700Sensor.h"
+#include "sensors/AccelerometerSensor.h"
+#include "sensors/LD2420Sensor.h"
+#include <ArduinoJson.h>
 #include <Preferences.h>
 
-// Watchdog timeout (8 seconds)
-constexpr uint32_t WDT_TIMEOUT = 8;
+// Hardware components
+LEDController systemLED(Config::SYSTEM_LED_PIN);
+LEDController activityLED(Config::ACTIVITY_LED_PIN);
+Buzzer buzzer(Config::BUZZER_PIN);
+WiFiManager wifiManager;
+MQTTHandler mqtt;
 
-// Preferences instance for persistent storage
+// Sensors
+BME280Sensor bme280;
+VEML7700Sensor veml7700;
+AccelerometerSensor accelerometer;
+LD2420Sensor ld2420;
+
+// Alarm system
+AlarmSystem alarmSystem(activityLED, buzzer, accelerometer, ld2420);
+
+// State variables
+bool relayState = false;
+uint32_t lastSensorPublish = 0;
+uint32_t lastStatusPublish = 0;
+uint32_t lastDebugOutput = 0;
+bool factoryResetActive = false;
+uint32_t factoryResetStart = 0;
+
+// Preferences for persistent storage
 Preferences preferences;
 
-// System components
-SensorManager sensorManager;
-std::unique_ptr<LEDController> ledController(new LEDController());
-std::unique_ptr<BuzzerController> buzzerController(new BuzzerController());
-MQTTHandler mqttHandler;
-TamperDetection tamperDetection;
-WiFiSetup wifiSetup;
-AlarmController alarmController;
-FactoryResetHandler resetHandler;
-
-// State tracking
-bool isConnected = false;
-bool isTampered = false;
-
-// Circular buffer for storing sensor data when offline
-struct SensorData {
-    float temperature;
-    float humidity;
-    float pressure;
-    float lux;
-    uint8_t presence;
-    uint16_t distance;
-    float soundRMS;
-    float soundPeak;
-    unsigned long timestamp;
-};
-
-static constexpr size_t BUFFER_SIZE = 60; // Store up to 60 readings
-static SensorData sensorBuffer[BUFFER_SIZE];
-static size_t bufferHead = 0;
-static size_t bufferCount = 0;
-
-void handleSensorUpdate() {
-    // Get all sensor data with error checking
-    auto& bme = sensorManager.getBME280();
-    auto& veml = sensorManager.getVEML7700();
-    auto& radar = sensorManager.getLD2402();
-    auto& mic = sensorManager.getMicrophone();
-
-    // Basic validation of sensor readings
-    if (bme.getTemperature() < -40.0f || bme.getTemperature() > 85.0f ||
-        bme.getHumidity() < 0.0f || bme.getHumidity() > 100.0f ||
-        veml.getLux() < 0.0f || 
-        mic.getRMSLevel() < 0.0f) {
-#if DEBUG
-        Serial.println("Invalid sensor readings detected");
-#endif
-        return;
-    }
-    
-    // Update alarm controller with sensor data
-    const auto& motionData = radar.getData();
-    alarmController.onMotionDetected(motionData.presenceState);
-    alarmController.onSoundDetected(mic.getRMSLevel());
-    
-    // Store sensor data in buffer
-    SensorData& data = sensorBuffer[bufferHead];
-    data.temperature = bme.getTemperature();
-    data.humidity = bme.getHumidity();
-    data.pressure = bme.getPressure();
-    data.lux = veml.getLux();
-    data.presence = motionData.presenceState;
-    data.distance = motionData.distance;
-    data.soundRMS = mic.getRMSLevel();
-    data.soundPeak = mic.getPeakLevel();
-    data.timestamp = millis();
-
-    bufferHead = (bufferHead + 1) % BUFFER_SIZE;
-    if (bufferCount < BUFFER_SIZE) bufferCount++;
-
-    // If connected, publish current and any buffered data
-    if (isConnected) {
-        // Publish current data
-        mqttHandler.publishEnvironment(data.temperature, data.humidity, data.pressure);
-        mqttHandler.publishLight(data.lux);
-        mqttHandler.publishMotion(data.presence, data.distance);
-        mqttHandler.publishSound(data.soundRMS, data.soundPeak);
-
-        // Try to publish buffered data if any
-        while (bufferCount > 1) { // Keep the latest reading
-            size_t tail = (bufferHead - bufferCount + BUFFER_SIZE) % BUFFER_SIZE;
-            SensorData& buffered = sensorBuffer[tail];
-            
-            // Only publish data less than 1 hour old
-            if (millis() - buffered.timestamp > 3600000) {
-                bufferCount--;
-                continue;
-            }
-
-            if (!mqttHandler.publishEnvironment(buffered.temperature, buffered.humidity, buffered.pressure) ||
-                !mqttHandler.publishLight(buffered.lux) ||
-                !mqttHandler.publishMotion(buffered.presence, buffered.distance) ||
-                !mqttHandler.publishSound(buffered.soundRMS, buffered.soundPeak)) {
-                break; // Stop if any publish fails
-            }
-            bufferCount--;
-        }
-    }
-}
-
-void handleTamper(bool tampered) {
-    isTampered = tampered;
-    mqttHandler.publishTamper(tampered);
-    
-    if (tampered) {
-        ledController->setSystemPattern(SystemPattern::ALARM);
-        ledController->setActivityPattern(ActivityPattern::ALARM);
-        buzzerController->playPattern(BuzzerPattern::ALARM);
-    } else {
-        ledController->setSystemPattern(SystemPattern::NORMAL);
-        ledController->setActivityPattern(ActivityPattern::OFF);
-        buzzerController->stop();
-    }
-}
-
-void handleMQTTCommand(const JsonDocument& doc) {
-    // Validate message structure
-    if (!doc.is<JsonObject>()) {
-#if DEBUG
-        Serial.println("Invalid command format");
-#endif
-        return;
-    }
-
-    // Rate limiting - prevent rapid commands
-    static unsigned long lastCommandTime = 0;
-    const unsigned long commandDelay = 1000; // Minimum 1 second between commands
-    
-    if (millis() - lastCommandTime < commandDelay) {
-#if DEBUG
-        Serial.println("Command rate limit exceeded");
-#endif
-        return;
-    }
-
-    // Command validation and handling
-    if (doc.containsKey("alarm")) {
-        if (!doc["alarm"].is<bool>()) {
-#if DEBUG
-            Serial.println("Invalid alarm command type");
-#endif
-            return;
-        }
-
-        bool alarm = doc["alarm"].as<bool>();
-        lastCommandTime = millis();
-
-        if (alarm) {
-            buzzerController->playPattern(BuzzerPattern::ALARM);
-            mqttHandler.publishStatus("alarm_active");
-        } else {
-            buzzerController->stop();
-            mqttHandler.publishStatus("alarm_cleared");
-        }
-    }
-}
-
-void handleAlarmState(AlarmController::State state, AlarmController::Trigger trigger) {
-    // Save state to persistent storage
-    preferences.begin("alarm", false);  // false = R/W mode
-    preferences.putUChar("state", static_cast<uint8_t>(state));
-    if (state == AlarmController::State::TRIGGERED) {
-        preferences.putUChar("trigger", static_cast<uint8_t>(trigger));
-        preferences.putULong("trigger_time", millis());
-    }
-    preferences.end();
-
-    switch (state) {
-        case AlarmController::State::ARMED:
-            ledController->setActivityPattern(ActivityPattern::ARMED);
-            mqttHandler.publishStatus("armed");
-            break;
-            
-        case AlarmController::State::DISARMED:
-            ledController->setActivityPattern(ActivityPattern::OFF);
-            mqttHandler.publishStatus("disarmed");
-            break;
-            
-        case AlarmController::State::TRIGGERED:
-            ledController->setActivityPattern(ActivityPattern::ALARM);
-            buzzerController->playPattern(BuzzerPattern::ALARM);
-            mqttHandler.publishAlarm(true, static_cast<int>(trigger));
-            break;
-    }
-}
+// Function declarations
+void publishSensorData();
+void publishStatus();
+void handleAlarmCommand(const String& command);
+void handleRelayCommand(bool state);
+void handleThresholdCommand(const String& sensor, float threshold);
+void checkFactoryReset();
+void performFactoryReset();
+void printSystemInfo();
+void scanI2CDevices();
 
 void setup() {
-#if DEBUG
     Serial.begin(115200);
-#endif
-
-    // Initialize watchdog
-    esp_task_wdt_init(WDT_TIMEOUT, true); // true = panic on timeout
-    esp_task_wdt_add(NULL); // Add current task to WDT watch
-
-    // Initialize components with startup indication
-    ledController->begin();
-    ledController->setSystemPattern(SystemPattern::STARTUP);
+    while (!Serial) delay(10);
     
-    buzzerController->begin();
-    buzzerController->playChime(BuzzerChime::STARTUP);
+    Serial.println("=== The Scout Starting ===");
     
-    resetHandler.begin();
+    // Print system information
+    printSystemInfo();
     
-    // Show startup indication
-    ledController->setSystemPattern(SystemPattern::CONNECTING);
+    // Initialize hardware
+    pinMode(Config::FACTORY_RESET_BTN, INPUT_PULLUP);
+    pinMode(Config::RELAY_PIN, OUTPUT);
+    pinMode(Config::POWER_GOOD_PIN, INPUT);
+    pinMode(Config::CHARGED_STATUS_PIN, INPUT);
     
-    // Setup factory reset handler with proper feedback
-    resetHandler.setResetCallback([](FactoryResetStage stage) {
-        switch (stage) {
-            case FactoryResetStage::START:
-                ledController->setSystemPattern(SystemPattern::FACTORY_RESET);
-                buzzerController->playChime(BuzzerChime::RESET_START);
-                break;
-            case FactoryResetStage::IN_PROGRESS:
-                ledController->setSystemPattern(SystemPattern::FACTORY_RESET_PROGRESS);
-                break;
-            case FactoryResetStage::COMPLETE:
-                ledController->setSystemPattern(SystemPattern::FACTORY_RESET_COMPLETE);
-                buzzerController->playChime(BuzzerChime::RESET_COMPLETE);
-                break;
-            case FactoryResetStage::FAILED:
-                ledController->setSystemPattern(SystemPattern::ERROR);
-                buzzerController->playChime(BuzzerChime::ERROR);
-                break;
-        }
-    });
+    // Initialize LEDs and buzzer
+    systemLED.begin();
+    activityLED.begin();
+    buzzer.begin();
     
-    // Initialize WiFi
-    wifiSetup.begin();
+    // Initialize preferences
+    preferences.begin("scout-config", false);
     
-    // Wait for WiFi connection with timeout (2 minutes as per PRD)
-    unsigned long startTime = millis();
-    while (!wifiSetup.isConnected() && millis() - startTime < 120000) {  // 2 minutes
-        wifiSetup.handle();
-        resetHandler.update();
-        ledController->update();
-        buzzerController->update();
-        yield();  // Allow system tasks to run
-        
-        // Check for factory reset during setup
-        if (digitalRead(Config::FACTORY_RESET_BTN) == LOW) {
-            resetHandler.update();
-        }
-    }
+    // Welcome pattern
+    systemLED.flashPattern(3, 200);
+    buzzer.playPattern(BuzzerPattern::SINGLE_BEEP);
     
-    if (!wifiSetup.isConnected()) {
-        buzzerController->playChime(BuzzerChime::ERROR);
-        ledController->setSystemPattern(SystemPattern::ERROR);
-        delay(2000);  // Show error for 2 seconds
-        ESP.restart();  // Restart if setup fails
-        return;
-    }
-    
-    // Show connection success
-    ledController->setSystemPattern(SystemPattern::CONNECTED);
-    buzzerController->playChime(BuzzerChime::WIFI_CONNECTED);  // Specific chime for WiFi connection
-    
-    // Initialize MQTT
-    mqttHandler.begin(wifiSetup.getDeviceID());
-    mqttHandler.setCommandCallback(handleMQTTCommand);
+    Serial.println("Hardware initialized");
     
     // Initialize sensors
-    if (!sensorManager.begin()) {
-#if DEBUG
-        Serial.println("Failed to initialize sensors: ");
-        Serial.println(sensorManager.getLastError());
-#endif
-        ledController->setSystemPattern(SystemPattern::ERROR);
-        buzzerController->playChime(BuzzerChime::ERROR);
-        delay(1000);  // Give time for the error indication
-        ESP.restart();
-        return;
+    Serial.println("Initializing sensors...");
+    
+    Wire.begin(Config::I2C_SDA_PIN, Config::I2C_SCL_PIN);
+    
+    // Scan for I2C devices
+    Serial.println("Scanning I2C bus...");
+    scanI2CDevices();
+    
+    bool sensorSuccess = true;
+    
+    Serial.print("BME280 (Environmental): ");
+    if (!bme280.begin()) {
+        Serial.println("FAILED - Check I2C wiring and address 0x76");
+        sensorSuccess = false;
+    } else {
+        Serial.println("SUCCESS");
     }
     
-    // Initialize alarm system with LED and Buzzer controllers
-    alarmController.begin(ledController.get(), buzzerController.get());
-    alarmController.setStateCallback(handleAlarmState);
-
-    // Restore last known alarm state
-    preferences.begin("alarm", true);  // true = read-only mode
-    if (preferences.isKey("state")) {
-        auto savedState = static_cast<AlarmController::State>(preferences.getUChar("state"));
-        if (savedState == AlarmController::State::ARMED) {
-            alarmController.arm();
-        } else if (savedState == AlarmController::State::TRIGGERED) {
-            // Only restore triggered state if it was recent (within last hour)
-            unsigned long triggerTime = preferences.getULong("trigger_time", 0);
-            if (millis() - triggerTime < 3600000) {
-                auto savedTrigger = static_cast<AlarmController::Trigger>(preferences.getUChar("trigger"));
-                // Simulate the trigger through sensor events
-                if (savedTrigger == AlarmController::Trigger::MOTION) {
-                    alarmController.onMotionDetected(true);
-                } else if (savedTrigger == AlarmController::Trigger::SOUND) {
-                    alarmController.onSoundDetected(100.0f); // Threshold value
-                } else if (savedTrigger == AlarmController::Trigger::TAMPER) {
-                    alarmController.onTamperDetected(true);
+    Serial.print("VEML7700 (Light): ");
+    if (!veml7700.begin()) {
+        Serial.println("FAILED - Check I2C wiring and address 0x10");
+        sensorSuccess = false;
+    } else {
+        Serial.println("SUCCESS");
+    }
+    
+    Serial.print("MPU6050 (Accelerometer): ");
+    if (!accelerometer.begin()) {
+        Serial.println("FAILED - Check I2C wiring and address 0x68");
+        sensorSuccess = false;
+    } else {
+        Serial.println("SUCCESS");
+    }
+    
+    Serial.print("LD2420 (mmWave Radar): ");
+    if (!ld2420.begin()) {
+        Serial.println("FAILED - Check UART wiring TX/RX pins");
+        sensorSuccess = false;
+    } else {
+        Serial.println("SUCCESS");
+    }
+    
+    if (sensorSuccess) {
+        buzzer.playPattern(BuzzerPattern::SUCCESS_CHIME);
+        Serial.println("All sensors initialized successfully");
+    } else {
+        buzzer.playPattern(BuzzerPattern::FAILURE_CHIME);
+        Serial.println("Some sensors failed to initialize");
+    }
+    
+    // Initialize WiFi
+    Serial.println("Initializing WiFi...");
+    wifiManager.begin();
+    
+    systemLED.setState(LEDState::BLINK); // Red blinking during connection
+    
+    if (!wifiManager.autoConnect()) {
+        Serial.println("Starting WiFi config portal...");
+        wifiManager.startConfigPortal();
+        
+        // Wait for WiFi configuration
+        while (!wifiManager.isConnected()) {
+            wifiManager.handleClient();
+            systemLED.update();
+            delay(100);
+            
+            // Check for factory reset during setup
+            if (digitalRead(Config::FACTORY_RESET_BTN) == LOW) {
+                if (!factoryResetActive) {
+                    factoryResetActive = true;
+                    factoryResetStart = millis();
+                    systemLED.setState(LEDState::FAST_BLINK);
+                } else if (millis() - factoryResetStart >= 5000) {
+                    // Factory reset triggered
+                    performFactoryReset();
+                    return;
                 }
+            } else {
+                factoryResetActive = false;
+                systemLED.setState(LEDState::BLINK);
             }
         }
     }
-    preferences.end();
     
-    // Initialize tamper detection
-    tamperDetection.begin();
-    tamperDetection.setTamperCallback([](bool tampered) {
-        alarmController.onTamperDetected(tampered);
-    });
+    if (wifiManager.isConnected()) {
+        systemLED.flashPattern(3, 200); // Green flash 3 times
+        buzzer.playPattern(BuzzerPattern::SUCCESS_CHIME);
+        Serial.println("WiFi connected successfully");
+        Serial.print("Device ID: ");
+        Serial.println(wifiManager.getDeviceId());
+    } else {
+        buzzer.playPattern(BuzzerPattern::WIFI_TIMEOUT);
+        Serial.println("WiFi connection failed");
+    }
     
-    // Set up sensor update callback
-    sensorManager.setUpdateCallback(handleSensorUpdate);
+    // Initialize MQTT
+    if (wifiManager.isConnected()) {
+        Serial.println("Initializing MQTT...");
+        mqtt.begin(wifiManager.getDeviceId());
+        
+        // Set up MQTT callbacks
+        mqtt.setAlarmCallback([](const String& command) {
+            handleAlarmCommand(command);
+        });
+        
+        mqtt.setRelayCallback([](bool state) {
+            handleRelayCommand(state);
+        });
+        
+        mqtt.setThresholdCallback([](const String& sensor, float threshold) {
+            handleThresholdCommand(sensor, threshold);
+        });
+    }
+    
+    // Initialize alarm system
+    alarmSystem.begin();
+    
+    // Load saved relay state
+    relayState = preferences.getBool("relay_state", false);
+    digitalWrite(Config::RELAY_PIN, relayState ? HIGH : LOW);
+    
+    Serial.println("=== The Scout Ready ===");
+    systemLED.setState(LEDState::OFF);
+    
+    // Initial sensor readings
+    Serial.println("=== Initial Sensor Readings ===");
+    delay(1000); // Allow sensors to stabilize
+    publishSensorData();
 }
 
 void loop() {
-    // Feed the watchdog
-    esp_task_wdt_reset();
-
-    // Update WiFi and check connection
-    wifiSetup.handle();
-    bool currentlyConnected = wifiSetup.isConnected();
+    uint32_t currentTime = millis();
     
-    if (currentlyConnected != isConnected) {
-        isConnected = currentlyConnected;
+    // Update all components
+    systemLED.update();
+    buzzer.update();
+    alarmSystem.update();
+    
+    // Handle WiFi client (if in setup mode)
+    wifiManager.handleClient();
+    
+    // Handle MQTT
+    if (wifiManager.isConnected()) {
+        mqtt.loop();
+    }
+    
+    // Update sensors
+    accelerometer.update();
+    ld2420.update();
+    
+    // Check factory reset button
+    checkFactoryReset();
+    
+    // Publish sensor data
+    if (currentTime - lastSensorPublish >= Config::SENSOR_READ_INTERVAL) {
+        publishSensorData();
+        lastSensorPublish = currentTime;
+    }
+    
+    // Publish status
+    if (currentTime - lastStatusPublish >= Config::STATUS_UPDATE_INTERVAL) {
+        publishStatus();
+        lastStatusPublish = currentTime;
+    }
+    
+    // Debug output (more frequent than sensor publishing)
+    #ifdef DEBUG_SERIAL
+    if (currentTime - lastDebugOutput >= Config::DEBUG_UPDATE_INTERVAL) {
+        publishSensorData(); // This will show current sensor readings
+        lastDebugOutput = currentTime;
+    }
+    #endif
+    
+    // Small delay to prevent watchdog timeout
+    delay(10);
+}
+
+void publishSensorData() {
+    DynamicJsonDocument doc(1024);
+    
+    Serial.println("=== Sensor Status ===");
+    
+    // Show connection status
+    Serial.printf("Connection Status: BME280=%s, VEML7700=%s, MPU6050=%s, LD2420=%s\n",
+                  bme280.isConnected() ? "OK" : "FAIL",
+                  veml7700.isConnected() ? "OK" : "FAIL", 
+                  accelerometer.isConnected() ? "OK" : "FAIL",
+                  ld2420.isConnected() ? "OK" : "FAIL");
+    
+    // Environmental data
+    if (bme280.isConnected()) {
+        bme280.readSensor(doc);
+        float temp = doc["temperature"].as<float>();
+        float hum = doc["humidity"].as<float>();
+        float press = doc["pressure"].as<float>();
         
-        if (isConnected) {
-            ledController->setSystemPattern(SystemPattern::CONNECTED);
-            buzzerController->playChime(BuzzerChime::SUCCESS);
+        if (isnan(temp) || isnan(hum) || isnan(press)) {
+            Serial.println("BME280: Invalid readings (NaN)");
         } else {
-            ledController->setSystemPattern(SystemPattern::CONNECTING);
+            Serial.printf("BME280: T=%.1f°C, H=%.1f%%, P=%.1fhPa\n", temp, hum, press);
         }
-    }
-    
-    // Only process MQTT if connected
-    if (isConnected) {
-        mqttHandler.update();
-    }
-    
-    // Update all components with timing control
-    static unsigned long lastHealthCheck = 0;
-    static unsigned long lastUpdate = 0;
-    unsigned long now = millis();
-    
-    // Component updates
-    resetHandler.update();
-    sensorManager.update();
-    alarmController.update();
-    ledController->update();
-    buzzerController->update();
-    tamperDetection.update();
-
-    // System health check every minute
-    if (now - lastHealthCheck >= 60000) {
-        lastHealthCheck = now;
-#if DEBUG
-        // Report heap status
-        Serial.printf("Free heap: %lu bytes\n", ESP.getFreeHeap());
-        Serial.printf("Minimum free heap: %lu bytes\n", ESP.getMinFreeHeap());
-        Serial.printf("Uptime: %lu minutes\n", now / 60000);
-#endif
-        // Monitor battery status
-        bool onBattery = (digitalRead(Config::POWER_GOOD) == LOW);
-        bool batteryLow = (digitalRead(Config::CHARGED_STATUS) == LOW);
         
-        if (onBattery && batteryLow) {
-            ledController->setSystemPattern(SystemPattern::ERROR);
-            mqttHandler.publishStatus("battery_low");
+        if (mqtt.isConnected()) {
+            mqtt.publishSensorData("environment", doc);
+        }
+        doc.clear();
+    } else {
+        Serial.println("BME280: DISCONNECTED");
+    }
+    
+    // Light data
+    if (veml7700.isConnected()) {
+        veml7700.readSensor(doc);
+        float illum = doc["illuminance"].as<float>();
+        float als = doc["als"].as<float>();
+        
+        if (isnan(illum) || isnan(als)) {
+            Serial.println("VEML7700: Invalid readings (NaN)");
+        } else {
+            Serial.printf("VEML7700: Light=%.1flux, ALS=%.1f\n", illum, als);
+        }
+        
+        if (mqtt.isConnected()) {
+            mqtt.publishSensorData("light", doc);
+        }
+        doc.clear();
+    } else {
+        Serial.println("VEML7700: DISCONNECTED");
+    }
+    
+    // Motion/tamper data
+    if (accelerometer.isConnected()) {
+        accelerometer.readSensor(doc);
+        Serial.printf("MPU6050: X=%.2fg, Y=%.2fg, Z=%.2fg, Motion=%s\n", 
+                      doc["accel_x"].as<float>(), 
+                      doc["accel_y"].as<float>(), 
+                      doc["accel_z"].as<float>(),
+                      doc["motion_detected"].as<bool>() ? "YES" : "NO");
+        
+        if (mqtt.isConnected()) {
+            mqtt.publishSensorData("motion", doc);
+        }
+        doc.clear();
+    } else {
+        Serial.println("MPU6050: DISCONNECTED");
+    }
+    
+    // Presence data
+    if (ld2420.isConnected()) {
+        ld2420.readSensor(doc);
+        Serial.printf("LD2420: Presence=%s, Distance=%.1fm\n", 
+                      doc["presence"].as<bool>() ? "YES" : "NO",
+                      doc["distance"].as<float>());
+        
+        if (mqtt.isConnected()) {
+            mqtt.publishSensorData("presence", doc);
+        }
+        doc.clear();
+    } else {
+        Serial.println("LD2420: DISCONNECTED");
+    }
+    
+    // System status
+    Serial.printf("System: Alarm=%s, Relay=%s, WiFi=%ddBm, Heap=%d bytes\n", 
+                  alarmSystem.getStateString().c_str(),
+                  relayState ? "ON" : "OFF",
+                  WiFi.RSSI(),
+                  ESP.getFreeHeap());
+    
+    Serial.println("==================");
+}
+
+void publishStatus() {
+    DynamicJsonDocument doc(1024);
+    doc["device_id"] = wifiManager.getDeviceId();
+    doc["uptime"] = millis() / 1000;
+    doc["free_heap"] = ESP.getFreeHeap();
+    doc["wifi_rssi"] = WiFi.RSSI();
+    doc["alarm_state"] = alarmSystem.getStateString();
+    doc["relay_state"] = relayState ? "ON" : "OFF";
+    
+    // Serial status output
+    Serial.println("=== Device Status ===");
+    Serial.printf("Device ID: %s\n", wifiManager.getDeviceId().c_str());
+    Serial.printf("Uptime: %d seconds\n", millis() / 1000);
+    Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
+    Serial.printf("WiFi RSSI: %d dBm\n", WiFi.RSSI());
+    Serial.printf("Alarm State: %s\n", alarmSystem.getStateString().c_str());
+    Serial.printf("Relay State: %s\n", relayState ? "ON" : "OFF");
+    Serial.printf("MQTT Connected: %s\n", mqtt.isConnected() ? "YES" : "NO");
+    
+    // Power status
+    bool powerGood = digitalRead(Config::POWER_GOOD_PIN);
+    bool charged = digitalRead(Config::CHARGED_STATUS_PIN);
+    Serial.printf("Power Good: %s\n", powerGood ? "YES" : "NO");
+    Serial.printf("Battery Charged: %s\n", charged ? "YES" : "NO");
+    
+    Serial.println("==================");
+    
+    if (mqtt.isConnected()) {
+        mqtt.publishSensorData("status", doc);
+        mqtt.publishAlarmState(alarmSystem.getStateString());
+        mqtt.publishRelayState(relayState);
+    }
+}
+
+void handleAlarmCommand(const String& command) {
+    Serial.println("=== ALARM COMMAND ===");
+    Serial.println("Command: " + command);
+    
+    if (command == "ARM_AWAY") {
+        alarmSystem.setState(AlarmState::ARMED);
+        Serial.println("Alarm system ARMED");
+    } else if (command == "DISARM") {
+        alarmSystem.setState(AlarmState::DISARMED);
+        Serial.println("Alarm system DISARMED");
+    } else if (command == "SILENCE") {
+        alarmSystem.silence();
+        Serial.println("Alarm system SILENCED");
+    }
+    Serial.println("===================");
+}
+
+void handleRelayCommand(bool state) {
+    Serial.println("=== RELAY COMMAND ===");
+    Serial.println("State: " + String(state ? "ON" : "OFF"));
+    
+    relayState = state;
+    digitalWrite(Config::RELAY_PIN, relayState ? HIGH : LOW);
+    
+    // Save state to preferences
+    preferences.putBool("relay_state", relayState);
+    
+    // Publish state update
+    if (mqtt.isConnected()) {
+        mqtt.publishRelayState(relayState);
+    }
+    
+    Serial.println("Relay switched " + String(relayState ? "ON" : "OFF"));
+    Serial.println("==================");
+}
+
+void handleThresholdCommand(const String& sensor, float threshold) {
+    Serial.println("Threshold command received: " + sensor + " = " + String(threshold));
+    
+    if (sensor == "motion") {
+        alarmSystem.setTamperThreshold(threshold);
+        preferences.putFloat("tamper_threshold", threshold);
+    }
+}
+
+void checkFactoryReset() {
+    if (digitalRead(Config::FACTORY_RESET_BTN) == LOW) {
+        if (!factoryResetActive) {
+            factoryResetActive = true;
+            factoryResetStart = millis();
+            systemLED.setState(LEDState::FAST_BLINK);
+        } else if (millis() - factoryResetStart >= 5000) {
+            // Factory reset triggered
+            performFactoryReset();
+        }
+    } else {
+        if (factoryResetActive) {
+            factoryResetActive = false;
+            systemLED.setState(LEDState::OFF);
         }
     }
+}
 
-    // Maintain consistent fast update rate for responsiveness
-    unsigned long updateDuration = millis() - now;
-    if (updateDuration < 10) { // Target 100Hz update rate
-        delay(1);  // Minimal delay to prevent CPU hogging
+void performFactoryReset() {
+    Serial.println("Factory reset triggered!");
+    
+    // Flash LED and play chime
+    systemLED.flashPattern(5, 100);
+    buzzer.playPattern(BuzzerPattern::TRIPLE_BEEP);
+    
+    // Clear all stored data
+    wifiManager.clearCredentials();
+    preferences.clear();
+    
+    // Wait for feedback to complete
+    delay(2000);
+    
+    // Restart
+    ESP.restart();
+}
+
+void printSystemInfo() {
+    Serial.println("=== System Information ===");
+    Serial.printf("Chip Model: %s\n", ESP.getChipModel());
+    Serial.printf("Chip Revision: %d\n", ESP.getChipRevision());
+    Serial.printf("CPU Frequency: %d MHz\n", ESP.getCpuFreqMHz());
+    Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
+    Serial.printf("Flash Size: %d bytes\n", ESP.getFlashChipSize());
+    Serial.printf("Flash Speed: %d Hz\n", ESP.getFlashChipSpeed());
+    Serial.printf("MAC Address: %s\n", WiFi.macAddress().c_str());
+    Serial.println("=== Pin Configuration ===");
+    Serial.printf("Factory Reset Button: GPIO%d\n", Config::FACTORY_RESET_BTN);
+    Serial.printf("System LED: GPIO%d\n", Config::SYSTEM_LED_PIN);
+    Serial.printf("Activity LED: GPIO%d\n", Config::ACTIVITY_LED_PIN);
+    Serial.printf("Buzzer: GPIO%d\n", Config::BUZZER_PIN);
+    Serial.printf("Relay: GPIO%d\n", Config::RELAY_PIN);
+    Serial.printf("I2C SDA: GPIO%d\n", Config::I2C_SDA_PIN);
+    Serial.printf("I2C SCL: GPIO%d\n", Config::I2C_SCL_PIN);
+    Serial.printf("LD2420 RX: GPIO%d\n", Config::LD2420_RX_PIN);
+    Serial.printf("LD2420 TX: GPIO%d\n", Config::LD2420_TX_PIN);
+    Serial.printf("Accelerometer INT: GPIO%d\n", Config::ACCEL_INT_PIN);
+    Serial.printf("LD2420 INT: GPIO%d\n", Config::LD2420_INT_PIN);
+    Serial.printf("Power Good: GPIO%d\n", Config::POWER_GOOD_PIN);
+    Serial.printf("Charged Status: GPIO%d\n", Config::CHARGED_STATUS_PIN);
+    Serial.println("=== MQTT Configuration ===");
+    Serial.printf("Broker: %s:%d\n", Config::MQTT_BROKER, Config::MQTT_PORT);
+    Serial.printf("Username: %s\n", Config::MQTT_USER);
+    Serial.printf("Keep Alive: %d seconds\n", Config::MQTT_KEEP_ALIVE);
+    Serial.println("=========================");
+}
+
+void scanI2CDevices() {
+    Serial.println("=== I2C Device Scanner ===");
+    byte error, address;
+    int nDevices = 0;
+    
+    for (address = 1; address < 127; address++) {
+        Wire.beginTransmission(address);
+        error = Wire.endTransmission();
+        
+        if (error == 0) {
+            Serial.printf("I2C device found at address 0x%02X", address);
+            
+            // Identify known devices
+            switch (address) {
+                case 0x10:
+                    Serial.println(" (VEML7700)");
+                    break;
+                case 0x68:
+                    Serial.println(" (MPU6050)");
+                    break;
+                case 0x76:
+                    Serial.println(" (BME280)");
+                    break;
+                case 0x77:
+                    Serial.println(" (BME280 alt)");
+                    break;
+                default:
+                    Serial.println(" (Unknown)");
+                    break;
+            }
+            nDevices++;
+        } else if (error == 4) {
+            Serial.printf("Unknown error at address 0x%02X\n", address);
+        }
     }
+    
+    if (nDevices == 0) {
+        Serial.println("No I2C devices found");
+        Serial.println("Check wiring:");
+        Serial.printf("  SDA: GPIO%d\n", Config::I2C_SDA_PIN);
+        Serial.printf("  SCL: GPIO%d\n", Config::I2C_SCL_PIN);
+        Serial.println("  3.3V power to sensors");
+        Serial.println("  Ground connections");
+    } else {
+        Serial.printf("Found %d I2C devices\n", nDevices);
+    }
+    Serial.println("=========================");
 }

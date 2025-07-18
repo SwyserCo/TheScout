@@ -1,224 +1,279 @@
 #include "utility/MQTTHandler.h"
+#include "Config.h"
 
-// Home Assistant discovery prefixes
-constexpr char HA_DISCOVERY_PREFIX[] = "homeassistant";
-constexpr char HA_DEVICE_CLASS_TEMP[] = "temperature";
-constexpr char HA_DEVICE_CLASS_HUMID[] = "humidity";
-constexpr char HA_DEVICE_CLASS_PRESS[] = "pressure";
-constexpr char HA_DEVICE_CLASS_ILLUM[] = "illuminance";
-constexpr char HA_DEVICE_CLASS_MOTION[] = "motion";
-constexpr char HA_DEVICE_CLASS_SOUND[] = "sound";
+MQTTHandler* MQTTHandler::instance = nullptr;
 
-MQTTHandler::MQTTHandler() : client(espClient), lastReconnectAttempt(0), commandCallback(nullptr), thresholdsCallback(nullptr) {}
+MQTTHandler::MQTTHandler() : _client(_wifiClient), _lastReconnectAttempt(0) {
+    instance = this;
+}
 
 void MQTTHandler::begin(const String& deviceId) {
-    this->deviceId = deviceId;
-    client.setServer(Config::MQTT_SERVER, Config::MQTT_PORT);
-    client.setCallback([this](char* topic, uint8_t* payload, unsigned int length) {
-        this->handleCallback(topic, payload, length);
-    });
+    _deviceId = deviceId;
+    _baseTopic = "homeassistant/";
     
-    setupTopics();
-    lastReconnectAttempt = 0;
-    publishDiscoveryConfig();
+    _client.setServer(Config::MQTT_BROKER, Config::MQTT_PORT);
+    _client.setCallback(staticMessageCallback);
+    _client.setKeepAlive(Config::MQTT_KEEP_ALIVE);
 }
 
-void MQTTHandler::setupTopics() {
-    String base = String(Config::Topics::BASE) + deviceId + "/";
-    
-    statusTopic = base + Config::Topics::STATUS;
-    motionTopic = base + Config::Topics::MOTION;
-    environmentTopic = base + Config::Topics::ENVIRONMENT;
-    lightTopic = base + Config::Topics::LIGHT;
-    soundTopic = base + Config::Topics::SOUND;
-    tamperTopic = base + Config::Topics::TAMPER;
-    commandTopic = base + Config::Topics::COMMAND;
-    responseTopic = base + Config::Topics::RESPONSE;
-    thresholdsTopic = base + Config::Topics::THRESHOLDS;
-    thresholdsSetTopic = base + Config::Topics::THRESHOLDS_SET;
-    alarmTopic = base + Config::Topics::ALARM;
-}
-
-void MQTTHandler::update() {
-    if (!client.connected()) {
-        unsigned long now = millis();
-        if (now - lastReconnectAttempt > Config::MQTT_RECONNECT_DELAY) {
-            lastReconnectAttempt = now;
+void MQTTHandler::loop() {
+    if (!_client.connected()) {
+        uint32_t now = millis();
+        if (now - _lastReconnectAttempt > Config::MQTT_RECONNECT_DELAY) {
+            _lastReconnectAttempt = now;
             if (reconnect()) {
-                lastReconnectAttempt = 0;
+                _lastReconnectAttempt = 0;
             }
         }
     } else {
-        client.loop();
+        _client.loop();
     }
 }
 
-bool MQTTHandler::reconnect() {
-    if (client.connect(deviceId.c_str(), Config::MQTT_USER, Config::MQTT_PASSWORD)) {
-        // Subscribe to command topics
-        client.subscribe(commandTopic.c_str());
-        client.subscribe(thresholdsSetTopic.c_str());
-        
-        // Publish online status
-        publishStatus("online");
-        
-        return true;
-    }
-    return false;
+bool MQTTHandler::isConnected() const {
+    // Cast away const to call connected() method
+    return const_cast<PubSubClient*>(&_client)->connected();
 }
 
-void MQTTHandler::setCommandCallback(CommandCallback callback) {
-    commandCallback = callback;
+void MQTTHandler::publishSensorData(const String& sensor, const DynamicJsonDocument& data) {
+    if (!_client.connected()) return;
+    
+    String topic = "guardian/scout/" + _deviceId + "/" + sensor;
+    String payload;
+    serializeJson(data, payload);
+    
+    _client.publish(topic.c_str(), payload.c_str(), true);
 }
 
-void MQTTHandler::setThresholdsCallback(ThresholdsCallback callback) {
-    thresholdsCallback = callback;
+void MQTTHandler::publishAlarmState(const String& state) {
+    if (!_client.connected()) return;
+    
+    String topic = "guardian/scout/" + _deviceId + "/alarm/state";
+    _client.publish(topic.c_str(), state.c_str(), true);
+}
+
+void MQTTHandler::publishDeviceState(const String& state) {
+    if (!_client.connected()) return;
+    
+    String topic = "guardian/scout/" + _deviceId + "/status";
+    _client.publish(topic.c_str(), state.c_str(), true);
+}
+
+void MQTTHandler::publishRelayState(bool state) {
+    if (!_client.connected()) return;
+    
+    String topic = "guardian/scout/" + _deviceId + "/relay/state";
+    _client.publish(topic.c_str(), state ? "ON" : "OFF", true);
 }
 
 void MQTTHandler::publishDiscoveryConfig() {
-    if (!client.connected()) return;
-
-    StaticJsonDocument<512> doc;
-    String topic;
+    if (!_client.connected()) return;
     
-    // Temperature Sensor
-    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + deviceId + "/temperature/config";
-    doc.clear();
-    String tempName = deviceId + " Temperature";
-    doc["name"] = tempName.c_str();
-    doc["device_class"] = HA_DEVICE_CLASS_TEMP;
-    doc["unit_of_measurement"] = "°C";
-    doc["state_topic"] = environmentTopic.c_str();
-    doc["value_template"] = "{{ value_json.temperature }}";
-    String tempId = deviceId + "_temperature";
-    doc["unique_id"] = tempId.c_str();
-    publishJson(topic.c_str(), doc);
+    // Temperature sensor
+    publishDiscoverySensor("Temperature", "temperature", 
+        "guardian/scout/" + _deviceId + "/environment", "°C");
     
-    // Humidity Sensor
-    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + deviceId + "/humidity/config";
-    doc.clear();
-    String humName = deviceId + " Humidity";
-    doc["name"] = humName.c_str();
-    doc["device_class"] = HA_DEVICE_CLASS_HUMID;
-    doc["unit_of_measurement"] = "%";
-    doc["state_topic"] = environmentTopic.c_str();
-    doc["value_template"] = "{{ value_json.humidity }}";
-    String humId = deviceId + "_humidity";
-    doc["unique_id"] = humId.c_str();
-    publishJson(topic.c_str(), doc);
+    // Humidity sensor
+    publishDiscoverySensor("Humidity", "humidity", 
+        "guardian/scout/" + _deviceId + "/environment", "%");
     
-    // Light Sensor
-    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + deviceId + "/light/config";
-    doc.clear();
-    String lightName = deviceId + " Light";
-    doc["name"] = lightName.c_str();
-    doc["device_class"] = HA_DEVICE_CLASS_ILLUM;
-    doc["unit_of_measurement"] = "lx";
-    doc["state_topic"] = lightTopic.c_str();
-    doc["value_template"] = "{{ value_json.lux }}";
-    String lightId = deviceId + "_light";
-    doc["unique_id"] = lightId.c_str();
-    publishJson(topic.c_str(), doc);
+    // Pressure sensor
+    publishDiscoverySensor("Pressure", "pressure", 
+        "guardian/scout/" + _deviceId + "/environment", "hPa");
     
-    // Motion Sensor
-    topic = String(HA_DISCOVERY_PREFIX) + "/binary_sensor/" + deviceId + "/motion/config";
-    doc.clear();
-    String motionName = deviceId + " Motion";
-    doc["name"] = motionName.c_str();
-    doc["device_class"] = HA_DEVICE_CLASS_MOTION;
-    doc["state_topic"] = motionTopic.c_str();
-    doc["value_template"] = "{{ value_json.presence }}";
-    String motionId = deviceId + "_motion";
-    doc["unique_id"] = motionId.c_str();
-    publishJson(topic.c_str(), doc);
+    // Light sensor
+    publishDiscoverySensor("Light", "illuminance", 
+        "guardian/scout/" + _deviceId + "/light", "lx");
     
-    // Sound Level
-    topic = String(HA_DISCOVERY_PREFIX) + "/sensor/" + deviceId + "/sound/config";
-    doc.clear();
-    String soundName = deviceId + " Sound Level";
-    doc["name"] = soundName.c_str();
-    doc["device_class"] = HA_DEVICE_CLASS_SOUND;
-    doc["unit_of_measurement"] = "dB";
-    doc["state_topic"] = soundTopic.c_str();
-    doc["value_template"] = "{{ value_json.level }}";
-    String soundId = deviceId + "_sound";
-    doc["unique_id"] = soundId.c_str();
-    publishJson(topic.c_str(), doc);
+    // Motion sensor
+    publishDiscoveryBinarySensor("Motion", "motion", 
+        "guardian/scout/" + _deviceId + "/motion");
+    
+    // Tamper sensor
+    publishDiscoveryBinarySensor("Tamper", "tamper", 
+        "guardian/scout/" + _deviceId + "/tamper");
+    
+    // Relay switch
+    publishDiscoverySwitch("Relay", 
+        "guardian/scout/" + _deviceId + "/relay/state",
+        "guardian/scout/" + _deviceId + "/relay/set");
+    
+    // Alarm panel
+    publishDiscoveryAlarm("Alarm", 
+        "guardian/scout/" + _deviceId + "/alarm/state",
+        "guardian/scout/" + _deviceId + "/alarm/set");
 }
 
-bool MQTTHandler::publishJson(const char* topic, JsonDocument& doc) {
-    String output;
-    serializeJson(doc, output);
-    return client.publish(topic, output.c_str(), true);  // Retain discovery messages
+void MQTTHandler::setAlarmCallback(std::function<void(const String&)> callback) {
+    _alarmCallback = callback;
 }
 
-void MQTTHandler::handleCallback(char* topic, uint8_t* payload, unsigned int length) {
-    String message;
+void MQTTHandler::setRelayCallback(std::function<void(bool)> callback) {
+    _relayCallback = callback;
+}
+
+void MQTTHandler::setThresholdCallback(std::function<void(const String&, float)> callback) {
+    _thresholdCallback = callback;
+}
+
+bool MQTTHandler::reconnect() {
+    if (_client.connect(_deviceId.c_str(), Config::MQTT_USER, Config::MQTT_PASSWORD)) {
+        Serial.println("MQTT connected");
+        
+        // Subscribe to command topics
+        String alarmTopic = "guardian/scout/" + _deviceId + "/alarm/set";
+        String relayTopic = "guardian/scout/" + _deviceId + "/relay/set";
+        String thresholdTopic = "guardian/scout/" + _deviceId + "/thresholds/set";
+        
+        _client.subscribe(alarmTopic.c_str());
+        _client.subscribe(relayTopic.c_str());
+        _client.subscribe(thresholdTopic.c_str());
+        
+        publishDeviceState("online");
+        publishDiscoveryConfig();
+        
+        return true;
+    }
+    
+    Serial.print("MQTT connection failed, rc=");
+    Serial.println(_client.state());
+    return false;
+}
+
+void MQTTHandler::onMessage(char* topic, byte* payload, unsigned int length) {
+    String message = "";
     for (unsigned int i = 0; i < length; i++) {
         message += (char)payload[i];
     }
     
-    StaticJsonDocument<200> doc;
-    DeserializationError error = deserializeJson(doc, message);
-    if (error) {
-        return;
+    String topicStr = String(topic);
+    
+    if (topicStr.endsWith("/alarm/set") && _alarmCallback) {
+        _alarmCallback(message);
+    } else if (topicStr.endsWith("/relay/set") && _relayCallback) {
+        _relayCallback(message == "ON");
+    } else if (topicStr.endsWith("/thresholds/set") && _thresholdCallback) {
+        // Parse JSON threshold message
+        DynamicJsonDocument doc(1024);
+        DeserializationError error = deserializeJson(doc, message);
+        if (!error) {
+            if (doc.containsKey("motion_threshold")) {
+                _thresholdCallback("motion", doc["motion_threshold"]);
+            }
+        }
+    }
+}
+
+void MQTTHandler::publishDiscoveryDevice(const String& component, const String& name, const String& deviceClass) {
+    DynamicJsonDocument doc(1024);
+    doc["name"] = name;
+    doc["unique_id"] = _deviceId + "_" + name.substring(0, 10);
+    doc["device"]["identifiers"][0] = _deviceId;
+    doc["device"]["name"] = _deviceId;
+    doc["device"]["model"] = "The Scout";
+    doc["device"]["manufacturer"] = "Guardian Security";
+    
+    if (deviceClass.length() > 0) {
+        doc["device_class"] = deviceClass;
     }
     
-    if (strcmp(topic, commandTopic.c_str()) == 0) {
-        if (commandCallback) {
-            commandCallback(doc);
-        }
-    } else if (strcmp(topic, thresholdsSetTopic.c_str()) == 0) {
-        if (thresholdsCallback) {
-            thresholdsCallback(doc);
-        }
+    String topic = _baseTopic + component + "/" + _deviceId + "/" + name + "/config";
+    String payload;
+    serializeJson(doc, payload);
+    
+    _client.publish(topic.c_str(), payload.c_str(), true);
+}
+
+void MQTTHandler::publishDiscoveryBinarySensor(const String& name, const String& deviceClass, const String& stateTopic) {
+    DynamicJsonDocument doc(1024);
+    doc["name"] = name;
+    doc["unique_id"] = _deviceId + "_" + name.substring(0, 10);
+    doc["device_class"] = deviceClass;
+    doc["state_topic"] = stateTopic;
+    doc["payload_on"] = "ON";
+    doc["payload_off"] = "OFF";
+    
+    doc["device"]["identifiers"][0] = _deviceId;
+    doc["device"]["name"] = _deviceId;
+    doc["device"]["model"] = "The Scout";
+    doc["device"]["manufacturer"] = "Guardian Security";
+    
+    String topic = _baseTopic + "binary_sensor/" + _deviceId + "/" + name + "/config";
+    String payload;
+    serializeJson(doc, payload);
+    
+    _client.publish(topic.c_str(), payload.c_str(), true);
+}
+
+void MQTTHandler::publishDiscoverySensor(const String& name, const String& deviceClass, const String& stateTopic, const String& unit) {
+    DynamicJsonDocument doc(1024);
+    doc["name"] = name;
+    doc["unique_id"] = _deviceId + "_" + name.substring(0, 10);
+    doc["device_class"] = deviceClass;
+    doc["state_topic"] = stateTopic;
+    doc["value_template"] = "{{ value_json." + name.substring(0, 10) + " }}";
+    
+    if (unit.length() > 0) {
+        doc["unit_of_measurement"] = unit;
     }
+    
+    doc["device"]["identifiers"][0] = _deviceId;
+    doc["device"]["name"] = _deviceId;
+    doc["device"]["model"] = "The Scout";
+    doc["device"]["manufacturer"] = "Guardian Security";
+    
+    String topic = _baseTopic + "sensor/" + _deviceId + "/" + name + "/config";
+    String payload;
+    serializeJson(doc, payload);
+    
+    _client.publish(topic.c_str(), payload.c_str(), true);
 }
 
-bool MQTTHandler::publishEnvironment(float temp, float humidity, float pressure) {
-    StaticJsonDocument<200> doc;
-    doc["temperature"] = temp;
-    doc["humidity"] = humidity;
-    doc["pressure"] = pressure;
-    return publishJson(environmentTopic.c_str(), doc);
+void MQTTHandler::publishDiscoverySwitch(const String& name, const String& stateTopic, const String& commandTopic) {
+    DynamicJsonDocument doc(1024);
+    doc["name"] = name;
+    doc["unique_id"] = _deviceId + "_" + name.substring(0, 10);
+    doc["state_topic"] = stateTopic;
+    doc["command_topic"] = commandTopic;
+    doc["payload_on"] = "ON";
+    doc["payload_off"] = "OFF";
+    
+    doc["device"]["identifiers"][0] = _deviceId;
+    doc["device"]["name"] = _deviceId;
+    doc["device"]["model"] = "The Scout";
+    doc["device"]["manufacturer"] = "Guardian Security";
+    
+    String topic = _baseTopic + "switch/" + _deviceId + "/" + name + "/config";
+    String payload;
+    serializeJson(doc, payload);
+    
+    _client.publish(topic.c_str(), payload.c_str(), true);
 }
 
-bool MQTTHandler::publishLight(float lux) {
-    StaticJsonDocument<128> doc;
-    doc["lux"] = lux;
-    return publishJson(lightTopic.c_str(), doc);
+void MQTTHandler::publishDiscoveryAlarm(const String& name, const String& stateTopic, const String& commandTopic) {
+    DynamicJsonDocument doc(1024);
+    doc["name"] = name;
+    doc["unique_id"] = _deviceId + "_alarm";
+    doc["state_topic"] = stateTopic;
+    doc["command_topic"] = commandTopic;
+    doc["supported_features"] = 3; // ARM_AWAY and DISARM
+    doc["code_arm_required"] = false;
+    doc["code_disarm_required"] = false;
+    
+    doc["device"]["identifiers"][0] = _deviceId;
+    doc["device"]["name"] = _deviceId;
+    doc["device"]["model"] = "The Scout";
+    doc["device"]["manufacturer"] = "Guardian Security";
+    
+    String topic = _baseTopic + "alarm_control_panel/" + _deviceId + "/" + name + "/config";
+    String payload;
+    serializeJson(doc, payload);
+    
+    _client.publish(topic.c_str(), payload.c_str(), true);
 }
 
-bool MQTTHandler::publishMotion(uint8_t presence, uint16_t distance) {
-    StaticJsonDocument<128> doc;
-    doc["presence"] = presence > 0 ? "ON" : "OFF";
-    doc["distance"] = distance;
-    return publishJson(motionTopic.c_str(), doc);
-}
-
-bool MQTTHandler::publishSound(float rms, float peak) {
-    StaticJsonDocument<128> doc;
-    doc["level"] = rms;
-    doc["peak"] = peak;
-    return publishJson(soundTopic.c_str(), doc);
-}
-
-bool MQTTHandler::publishTamper(bool tampered) {
-    StaticJsonDocument<128> doc;
-    doc["tampered"] = tampered;
-    return publishJson(tamperTopic.c_str(), doc);
-}
-
-bool MQTTHandler::publishStatus(const char* status) {
-    StaticJsonDocument<128> doc;
-    doc["status"] = status;
-    doc["timestamp"] = millis();
-    return publishJson(statusTopic.c_str(), doc);
-}
-
-bool MQTTHandler::publishAlarm(bool triggered, int reason) {
-    StaticJsonDocument<128> doc;
-    doc["triggered"] = triggered;
-    doc["reason"] = reason;
-    return publishJson(alarmTopic.c_str(), doc);
+void MQTTHandler::staticMessageCallback(char* topic, byte* payload, unsigned int length) {
+    if (instance) {
+        instance->onMessage(topic, payload, length);
+    }
 }

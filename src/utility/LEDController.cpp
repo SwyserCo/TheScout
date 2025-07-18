@@ -1,133 +1,111 @@
 #include "utility/LEDController.h"
+#include "Config.h"
+
+LEDController::LEDController(uint8_t pin) 
+    : _pin(pin), _state(LEDState::OFF), _ledOn(false), 
+      _lastUpdate(0), _blinkInterval(Config::LED_BLINK_INTERVAL),
+      _flashCount(0), _flashRemaining(0), _flashDuration(200),
+      _flashStart(0), _flashActive(false) {
+}
 
 void LEDController::begin() {
-    pinMode(Config::SYSTEM_LED, OUTPUT);
-    pinMode(Config::ACTIVITY_LED, OUTPUT);
-    
-    // Initialize all LEDs to OFF
-    digitalWrite(Config::SYSTEM_LED, LOW);
-    digitalWrite(Config::ACTIVITY_LED, LOW);
+    pinMode(_pin, OUTPUT);
+    digitalWrite(_pin, LOW);
 }
 
-void LEDController::update() {
-    unsigned long currentTime = millis();
-    updateSystemLED(currentTime);
-    updateActivityLED(currentTime);
-}
-
-void LEDController::updateSystemLED(unsigned long currentTime) {
-    static uint8_t flashCount = 0;
+void LEDController::setState(LEDState state) {
+    _state = state;
+    _lastUpdate = millis();
     
-    switch (systemPattern) {
-        case LEDPattern::OFF:
-            digitalWrite(Config::SYSTEM_LED, LOW);
-            break;
-            
-        case LEDPattern::ON:
-            digitalWrite(Config::SYSTEM_LED, HIGH);
-            break;
-            
-        case LEDPattern::BLINK_SLOW:
-            if (currentTime - systemLastUpdate >= 1000) {
-                systemState = !systemState;
-                digitalWrite(Config::SYSTEM_LED, systemState);
-                systemLastUpdate = currentTime;
-            }
-            break;
-            
-        case LEDPattern::BLINK_FAST:
-            if (currentTime - systemLastUpdate >= 200) {
-                systemState = !systemState;
-                digitalWrite(Config::SYSTEM_LED, systemState);
-                systemLastUpdate = currentTime;
-            }
-            break;
-            
-        case LEDPattern::PULSE:
-            // For factory reset indication
-            if (currentTime - systemLastUpdate >= 100) {
-                systemState = !systemState;
-                digitalWrite(Config::SYSTEM_LED, systemState);
-                systemLastUpdate = currentTime;
-            }
-            break;
-            
-        case LEDPattern::FLASH_3X:
-            if (currentTime - systemLastUpdate >= 200) {
-                systemState = !systemState;
-                if (!systemState) {  // On falling edge
-                    flashCount++;
-                    if (flashCount >= 6) {  // 3 complete cycles
-                        systemPattern = LEDPattern::OFF;
-                        flashCount = 0;
-                        break;
-                    }
-                }
-                digitalWrite(Config::SYSTEM_LED, systemState);
-                systemLastUpdate = currentTime;
-            }
-            break;
+    if (state == LEDState::OFF) {
+        digitalWrite(_pin, LOW);
+        _ledOn = false;
+        _flashActive = false;
+    } else if (state == LEDState::ON) {
+        digitalWrite(_pin, HIGH);
+        _ledOn = true;
+        _flashActive = false;
     }
 }
 
-void LEDController::updateActivityLED(unsigned long currentTime) {
-    switch (activityPattern) {
-        case LEDPattern::OFF:
-            digitalWrite(Config::ACTIVITY_LED, LOW);
+void LEDController::update() {
+    if (_flashActive) {
+        uint32_t elapsed = millis() - _flashStart;
+        
+        if (elapsed >= _flashDuration) {
+            if (_flashRemaining > 0) {
+                _flashRemaining--;
+                _ledOn = !_ledOn;
+                digitalWrite(_pin, _ledOn ? HIGH : LOW);
+                _flashStart = millis();
+            } else {
+                _flashActive = false;
+                setState(LEDState::OFF);
+            }
+        }
+        return;
+    }
+    
+    uint32_t currentTime = millis();
+    
+    switch (_state) {
+        case LEDState::BLINK:
+            if (currentTime - _lastUpdate >= _blinkInterval) {
+                _ledOn = !_ledOn;
+                digitalWrite(_pin, _ledOn ? HIGH : LOW);
+                _lastUpdate = currentTime;
+            }
             break;
             
-        case LEDPattern::ON:
-            digitalWrite(Config::ACTIVITY_LED, HIGH);
+        case LEDState::FAST_BLINK:
+            if (currentTime - _lastUpdate >= Config::LED_FAST_BLINK_INTERVAL) {
+                _ledOn = !_ledOn;
+                digitalWrite(_pin, _ledOn ? HIGH : LOW);
+                _lastUpdate = currentTime;
+            }
             break;
             
-        case LEDPattern::BLINK_FAST:
-            if (currentTime - activityLastUpdate >= 200) {
-                activityState = !activityState;
-                digitalWrite(Config::ACTIVITY_LED, activityState);
-                activityLastUpdate = currentTime;
+        case LEDState::PULSE:
+            // Simple pulse implementation
+            if (currentTime - _lastUpdate >= 50) {
+                static uint8_t brightness = 0;
+                static bool increasing = true;
+                
+                if (increasing) {
+                    brightness += 5;
+                    if (brightness >= 255) {
+                        brightness = 255;
+                        increasing = false;
+                    }
+                } else {
+                    brightness -= 5;
+                    if (brightness <= 0) {
+                        brightness = 0;
+                        increasing = true;
+                    }
+                }
+                
+                // For digital pins, approximate with PWM-like behavior
+                digitalWrite(_pin, brightness > 127 ? HIGH : LOW);
+                _lastUpdate = currentTime;
             }
             break;
             
         default:
-            digitalWrite(Config::ACTIVITY_LED, LOW);
             break;
     }
 }
 
-void LEDController::setSystemPattern(SystemPattern pattern) {
-    switch (pattern) {
-        case SystemPattern::OFF:
-            systemPattern = LEDPattern::OFF;
-            break;
-        case SystemPattern::CONNECTING:
-            systemPattern = LEDPattern::BLINK_SLOW;
-            break;
-        case SystemPattern::CONNECTED:
-            systemPattern = LEDPattern::FLASH_3X;  // Flash 3 times for successful connection
-            break;
-        case SystemPattern::ERROR:
-            systemPattern = LEDPattern::BLINK_FAST;
-            break;
-        case SystemPattern::FACTORY_RESET:
-            systemPattern = LEDPattern::PULSE;
-            break;
-    }
-    systemLastUpdate = 0;
-    systemState = false;
+void LEDController::flashPattern(uint8_t count, uint32_t duration) {
+    _flashCount = count;
+    _flashRemaining = count * 2; // On and off for each flash
+    _flashDuration = duration;
+    _flashStart = millis();
+    _flashActive = true;
+    _ledOn = true;
+    digitalWrite(_pin, HIGH);
 }
 
-void LEDController::setActivityPattern(ActivityPattern pattern) {
-    switch (pattern) {
-        case ActivityPattern::OFF:
-            activityPattern = LEDPattern::OFF;
-            break;
-        case ActivityPattern::ARMED:
-            activityPattern = LEDPattern::ON;
-            break;
-        case ActivityPattern::ALARM:
-            activityPattern = LEDPattern::BLINK_FAST;
-            break;
-    }
-    activityLastUpdate = 0;
-    activityState = false;
+void LEDController::setBlinkInterval(uint32_t interval) {
+    _blinkInterval = interval;
 }

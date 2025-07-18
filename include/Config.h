@@ -1,32 +1,27 @@
 #pragma once
 #include <cstdint>
 
-// Debug configuration
-#ifndef DEBUG
-#define DEBUG 0  // Default to debug disabled unless specified in build flags
-#endif
-
 // Hardware Pin Definitions
 namespace Config {
-    // Pin Configuration
-    constexpr uint8_t RESET_BUTTON_PIN = 2;    // IO02 (Factory Reset button)
-    constexpr uint8_t STATUS_LED_PIN = 3;      // IO09 (Also used as system LED)
-    constexpr uint8_t TAMPER_PIN = 9;          // IO10
-    constexpr uint8_t LD2420_INT = 11;         // IO11
-    constexpr uint8_t RELAY_PIN = 12;          // IO12
-    constexpr uint8_t CHARGED_STATUS = 14;     // IO14
-    constexpr uint8_t LD2420_RX = 15;         // IO15
-    constexpr uint8_t LD2420_TX = 16;         // IO16
-    constexpr uint8_t I2C_SDA_PIN = 17;       // IO17
-    constexpr uint8_t I2C_SCL_PIN = 18;       // IO18
-    constexpr uint8_t POWER_GOOD = 21;        // IO21
-    constexpr uint8_t SPL_MIC_PIN = 41;       // IO41
-    constexpr uint8_t ACTIVITY_LED = 45;      // IO48
-    constexpr uint8_t BUZZER_PIN = 40;        // IO40
-
-    // Aliases for shared pins (grouped with pin definitions for clarity)
-    constexpr uint8_t SYSTEM_LED = STATUS_LED_PIN;     // IO09
-    constexpr uint8_t FACTORY_RESET_BTN = RESET_BUTTON_PIN;  // IO02
+    // Debug Configuration
+    #define DEBUG_SERIAL 1                           // Enable debug serial output
+    constexpr uint32_t SERIAL_BAUD = 115200;        // Serial baud rate
+    constexpr uint32_t DEBUG_UPDATE_INTERVAL = 2000; // Debug output every 2 seconds
+    
+    // Pin Configuration (matching PRD pin mapping)
+    constexpr uint8_t FACTORY_RESET_BTN = 2;    // IO02 (Factory Reset button)
+    constexpr uint8_t SYSTEM_LED_PIN = 3;       // IO09 (System LED)
+    constexpr uint8_t ACCEL_INT_PIN = 9;       // IO10 (Accelerometer Interrupt)
+    constexpr uint8_t LD2420_INT_PIN = 10;      // IO11 (LD2420 Interrupt)
+    constexpr uint8_t RELAY_PIN = 12;           // IO12 (Relay)
+    constexpr uint8_t CHARGED_STATUS_PIN = 14;  // IO14 (Charged Status)
+    constexpr uint8_t LD2420_RX_PIN = 15;       // IO15 (LD2420 RX)
+    constexpr uint8_t LD2420_TX_PIN = 16;       // IO16 (LD2420 TX)
+    constexpr uint8_t I2C_SDA_PIN = 17;         // IO17 (I2C SDA)
+    constexpr uint8_t I2C_SCL_PIN = 18;         // IO18 (I2C SCL)
+    constexpr uint8_t POWER_GOOD_PIN = 21;      // IO21 (Power Good)
+    constexpr uint8_t BUZZER_PIN = 40;          // IO40 (Buzzer)
+    constexpr uint8_t ACTIVITY_LED_PIN = 48;    // IO48 (Activity LED)
 
     // I2C Configuration
     constexpr uint32_t I2C_FREQ = 400000;      // 400kHz
@@ -39,17 +34,11 @@ namespace Config {
     constexpr uint16_t MIC_SAMPLE_RATE = 16000;
     constexpr uint8_t MIC_SAMPLES = 128;
 
-    // MQTT Configuration
-#ifndef MQTT_SERVER
-    constexpr char MQTT_SERVER[] = "192.168.40.6";  // Default value, override in build flags
-#endif
+    // MQTT Configuration (from PRD)
+    constexpr char MQTT_BROKER[] = "192.168.40.6";
     constexpr uint16_t MQTT_PORT = 1883;
-#ifndef MQTT_USER
-    constexpr char MQTT_USER[] = "mqtt-user";       // Default value, override in build flags
-#endif
-#ifndef MQTT_PASSWORD
-    constexpr char MQTT_PASSWORD[] = "##DikTrill45";    // Default value, override in build flags
-#endif
+    constexpr char MQTT_USER[] = "mqtt-user";
+    constexpr char MQTT_PASSWORD[] = "##DikTrill45";
     constexpr uint16_t MQTT_KEEP_ALIVE = 60;
     constexpr uint16_t MQTT_RECONNECT_DELAY = 5000;
 

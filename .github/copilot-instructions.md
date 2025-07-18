@@ -70,10 +70,6 @@ include/
     setup
         WiFiManager.h
         FactoryResetHandler.h
-third_party_libs/
-test/
-unit/
-integration/
 
 ---
 
