@@ -83,6 +83,7 @@ void LIS2DW12Sensor::readSensor(DynamicJsonDocument& doc) {
         Serial.printf("[LIS2DW12] Current acceleration: X=%.3f, Y=%.3f, Z=%.3f (g)\n", _accelX, _accelY, _accelZ);
         Serial.printf("[LIS2DW12] Baseline: X=%.3f, Y=%.3f, Z=%.3f (g)\n", _baselineX, _baselineY, _baselineZ);
         Serial.printf("[LIS2DW12] Deviation: %.3f (threshold: %.3f)\n", deviation, _tamperThreshold);
+        Serial.printf("[LIS2DW12] Motion detection result: %s\n", _tamperDetected ? "YES" : "NO");
         #endif
     }
 }
@@ -102,13 +103,17 @@ bool LIS2DW12Sensor::checkTamper() {
     if (deviation > _tamperThreshold) {
         if (!_tamperDetected) {
             _tamperStartTime = currentTime;
-            Serial.printf("Motion started: deviation=%.3fg (threshold=%.3fg)\n", deviation, _tamperThreshold);
+            Serial.printf("[LIS2DW12] Motion started: deviation=%.3fg (threshold=%.3fg)\n", deviation, _tamperThreshold);
         }
         
         // Check if tamper condition persists for required duration
-        if (currentTime - _tamperStartTime >= TAMPER_DURATION) {
+        uint32_t durationElapsed = currentTime - _tamperStartTime;
+        if (durationElapsed >= TAMPER_DURATION) {
             _tamperDetected = true;
+            Serial.printf("[LIS2DW12] Motion confirmed after %dms\n", durationElapsed);
             return true;
+        } else {
+            Serial.printf("[LIS2DW12] Motion pending: %dms/%dms\n", durationElapsed, TAMPER_DURATION);
         }
     } else {
         // Reset tamper detection if below threshold for some time

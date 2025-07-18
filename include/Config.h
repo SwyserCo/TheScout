@@ -15,8 +15,8 @@ namespace Config {
     constexpr uint8_t LD2420_INT_PIN = 10;      // IO11 (LD2420 Interrupt)
     constexpr uint8_t RELAY_PIN = 12;           // IO12 (Relay)
     constexpr uint8_t CHARGED_STATUS_PIN = 14;  // IO14 (Charged Status)
-    constexpr uint8_t LD2420_RX_PIN = 15;       // IO15 (LD2420 RX)
-    constexpr uint8_t LD2420_TX_PIN = 16;       // IO16 (LD2420 TX)
+    constexpr uint8_t LD2420_RX_PIN = 16;       // IO16 (LD2420 RX) - Swapped
+    constexpr uint8_t LD2420_TX_PIN = 15;       // IO15 (LD2420 TX) - Swapped
     constexpr uint8_t I2C_SDA_PIN = 17;         // IO17 (I2C SDA)
     constexpr uint8_t I2C_SCL_PIN = 18;         // IO18 (I2C SCL)
     constexpr uint8_t POWER_GOOD_PIN = 21;      // IO21 (Power Good)

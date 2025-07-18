@@ -96,15 +96,30 @@ void LD2420Sensor::setPresenceThreshold(uint16_t threshold) {
 }
 
 void LD2420Sensor::readLD2420Data() {
-        // Read incoming UART data
+    #ifdef DEBUG
+    static uint32_t lastDebugTime = 0;
+    uint32_t currentTime = millis();
+    if (currentTime - lastDebugTime > 5000) { // Debug every 5 seconds
+        int availableBytes = _serial.available();
+        Serial.printf("[LD2420] Available bytes: %d\n", availableBytes);
+        if (availableBytes == 0) {
+            Serial.println("[LD2420] No data received - check wiring and power");
+        }
+        lastDebugTime = currentTime;
+    }
+    #endif
+    
+    // Read incoming UART data
     while (_serial.available() > 0) {
         uint8_t byte = _serial.read();
         
         #ifdef DEBUG
-        Serial.printf("[LD2420] Received byte: 0x%02X\n", byte);
-        #endif
-        
-        // Check for frame header
+        static uint32_t lastByteDebug = 0;
+        if (millis() - lastByteDebug > 2000) { // Debug bytes every 2 seconds
+            Serial.printf("[LD2420] Received byte: 0x%02X (total in buffer: %d)\n", byte, bufferIndex);
+            lastByteDebug = millis();
+        }
+        #endif        // Check for frame header
         if (byte == 0xF4) {
             bufferIndex = 0;
             buffer[bufferIndex++] = byte;
@@ -118,15 +133,22 @@ void LD2420Sensor::readLD2420Data() {
                     buffer[2] == 0xF2 && buffer[3] == 0xF1) {
                     
                     #ifdef DEBUG
-                    Serial.print("[LD2420] Frame received: ");
-                    for (int i = 0; i < 23; i++) {
-                        Serial.printf("0x%02X ", buffer[i]);
-                    }
-                    Serial.println();
+                    Serial.println("[LD2420] Valid frame header detected, parsing...");
                     #endif
                     
                     parseFrame();
+                } else {
+                    #ifdef DEBUG
+                    Serial.printf("[LD2420] Invalid header: %02X %02X %02X %02X\n", 
+                                  buffer[0], buffer[1], buffer[2], buffer[3]);
+                    #endif
                 }
+                bufferIndex = 0;
+            } else if (bufferIndex >= 25) {
+                // Buffer overflow protection
+                #ifdef DEBUG
+                Serial.println("[LD2420] Buffer overflow, resetting");
+                #endif
                 bufferIndex = 0;
             }
         }
@@ -134,26 +156,49 @@ void LD2420Sensor::readLD2420Data() {
 }
 
 void LD2420Sensor::parseFrame() {
-    // Parse 23-byte frame according to LD2420 protocol
-    // Frame format: [F4 F3 F2 F1] [length] [command] [data...] [checksum]
+    // LD2420 frame format (23 bytes total):
+    // [0-3]: Header F4 F3 F2 F1
+    // [4-5]: Data length
+    // [6]: Command type
+    // [7-8]: Moving target distance (little endian)
+    // [9]: Moving target energy
+    // [10-11]: Static target distance (little endian) 
+    // [12]: Static target energy
+    // [13-21]: Reserved/other data
+    // [22]: Checksum
     
-    // Extract moving target data (bytes 5-6)
-    uint16_t movingDistance = (buffer[6] << 8) | buffer[5];
+    #ifdef DEBUG
+    Serial.print("[LD2420] Raw frame data: ");
+    for (int i = 0; i < 23; i++) {
+        Serial.printf("%02X ", buffer[i]);
+    }
+    Serial.println();
+    #endif
     
-    // Extract static target data (bytes 7-8) 
-    uint16_t staticDistance = (buffer[8] << 8) | buffer[7];
+    // Extract moving target distance (bytes 7-8, little endian)
+    uint16_t movingDistance = buffer[7] | (buffer[8] << 8);
+    uint8_t movingEnergy = buffer[9];
     
-    // Extract signal strengths (bytes 9-10)
-    _signalStrength = buffer[9];
+    // Extract static target distance (bytes 10-11, little endian)
+    uint16_t staticDistance = buffer[10] | (buffer[11] << 8);
+    uint8_t staticEnergy = buffer[12];
     
-    // Update presence detection based on targets
-    _movingTarget = (movingDistance > 0 && movingDistance < 6000); // Max 6m range
-    _staticTarget = (staticDistance > 0 && staticDistance < 6000);
+    #ifdef DEBUG
+    Serial.printf("[LD2420] Moving: distance=%d cm, energy=%d\n", movingDistance, movingEnergy);
+    Serial.printf("[LD2420] Static: distance=%d cm, energy=%d\n", staticDistance, staticEnergy);
+    #endif
+    
+    // Update presence detection - consider targets with reasonable energy levels
+    _movingTarget = (movingDistance > 0 && movingDistance < 600 && movingEnergy > 10); // Max 6m, min energy
+    _staticTarget = (staticDistance > 0 && staticDistance < 600 && staticEnergy > 10);
     _presenceDetected = _movingTarget || _staticTarget;
     
-    // Use closer distance
+    // Store signal strength from the stronger target
+    _signalStrength = max(movingEnergy, staticEnergy);
+    
+    // Use closer distance, convert cm to meters
     if (_movingTarget && _staticTarget) {
-        _distance = min(movingDistance, staticDistance) / 100.0f; // Convert to meters
+        _distance = min(movingDistance, staticDistance) / 100.0f;
     } else if (_movingTarget) {
         _distance = movingDistance / 100.0f;
     } else if (_staticTarget) {
@@ -163,10 +208,11 @@ void LD2420Sensor::parseFrame() {
     }
     
     #ifdef DEBUG
-    Serial.printf("[LD2420] Moving: %s (%.2fm), Static: %s (%.2fm), Signal: %d\n", 
-                  _movingTarget ? "YES" : "NO", movingDistance/100.0f,
-                  _staticTarget ? "YES" : "NO", staticDistance/100.0f,
-                  _signalStrength);
+    Serial.printf("[LD2420] Result - Moving: %s, Static: %s, Presence: %s, Distance: %.2fm, Signal: %d\n", 
+                  _movingTarget ? "YES" : "NO", 
+                  _staticTarget ? "YES" : "NO",
+                  _presenceDetected ? "YES" : "NO",
+                  _distance, _signalStrength);
     #endif
 }
 

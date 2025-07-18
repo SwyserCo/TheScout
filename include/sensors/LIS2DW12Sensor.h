@@ -40,8 +40,8 @@ private:
     static constexpr uint8_t CTRL1_MODE_NORMAL = 0x04; // Normal mode
     
     static constexpr uint32_t READING_INTERVAL = 100;  // 100ms between readings
-    static constexpr uint32_t TAMPER_DURATION = 100;   // 100ms tamper detection duration
-    static constexpr float DEFAULT_TAMPER_THRESHOLD = 0.2f; // 0.2g threshold
+    static constexpr uint32_t TAMPER_DURATION = 50;    // 50ms tamper detection duration - very fast
+    static constexpr float DEFAULT_TAMPER_THRESHOLD = 0.05f; // 0.05g threshold - very sensitive
     static constexpr float SCALE_FACTOR = 0.000061f;   // LSB to g conversion (±2g, 16-bit)
 
     bool _connected;
