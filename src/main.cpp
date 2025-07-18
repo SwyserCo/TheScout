@@ -7,7 +7,7 @@
 #include "utility/AlarmSystem.h"
 #include "sensors/BME280Sensor.h"
 #include "sensors/VEML7700Sensor.h"
-#include "sensors/AccelerometerSensor.h"
+#include "sensors/LIS2DW12Sensor.h"
 #include "sensors/LD2420Sensor.h"
 #include <ArduinoJson.h>
 #include <Preferences.h>
@@ -22,7 +22,7 @@ MQTTHandler mqtt;
 // Sensors
 BME280Sensor bme280;
 VEML7700Sensor veml7700;
-AccelerometerSensor accelerometer;
+LIS2DW12Sensor accelerometer;
 LD2420Sensor ld2420;
 
 // Alarm system
@@ -106,9 +106,9 @@ void setup() {
         Serial.println("SUCCESS");
     }
     
-    Serial.print("MPU6050 (Accelerometer): ");
+    Serial.print("LIS2DW12TR (Accelerometer): ");
     if (!accelerometer.begin()) {
-        Serial.println("FAILED - Check I2C wiring and address 0x68");
+        Serial.println("FAILED - Check I2C wiring and address 0x19");
         sensorSuccess = false;
     } else {
         Serial.println("SUCCESS");
@@ -166,7 +166,7 @@ void setup() {
     
     if (wifiManager.isConnected()) {
         systemLED.flashPattern(3, 200); // Green flash 3 times
-        buzzer.playPattern(BuzzerPattern::SUCCESS_CHIME);
+        buzzer.playPattern(BuzzerPattern::STARTUP_CHIME);
         Serial.println("WiFi connected successfully");
         Serial.print("Device ID: ");
         Serial.println(wifiManager.getDeviceId());
@@ -263,7 +263,7 @@ void publishSensorData() {
     Serial.println("=== Sensor Status ===");
     
     // Show connection status
-    Serial.printf("Connection Status: BME280=%s, VEML7700=%s, MPU6050=%s, LD2420=%s\n",
+    Serial.printf("Connection Status: BME280=%s, VEML7700=%s, LIS2DW12TR=%s, LD2420=%s\n",
                   bme280.isConnected() ? "OK" : "FAIL",
                   veml7700.isConnected() ? "OK" : "FAIL", 
                   accelerometer.isConnected() ? "OK" : "FAIL",
@@ -313,7 +313,7 @@ void publishSensorData() {
     // Motion/tamper data
     if (accelerometer.isConnected()) {
         accelerometer.readSensor(doc);
-        Serial.printf("MPU6050: X=%.2fg, Y=%.2fg, Z=%.2fg, Motion=%s\n", 
+        Serial.printf("LIS2DW12TR: X=%.2fg, Y=%.2fg, Z=%.2fg, Motion=%s\n", 
                       doc["accel_x"].as<float>(), 
                       doc["accel_y"].as<float>(), 
                       doc["accel_z"].as<float>(),
@@ -324,7 +324,7 @@ void publishSensorData() {
         }
         doc.clear();
     } else {
-        Serial.println("MPU6050: DISCONNECTED");
+        Serial.println("LIS2DW12TR: DISCONNECTED");
     }
     
     // Presence data
@@ -513,6 +513,9 @@ void scanI2CDevices() {
             switch (address) {
                 case 0x10:
                     Serial.println(" (VEML7700)");
+                    break;
+                case 0x19:
+                    Serial.println(" (LIS2DW12TR)");
                     break;
                 case 0x68:
                     Serial.println(" (MPU6050)");

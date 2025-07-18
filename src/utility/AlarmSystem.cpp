@@ -2,7 +2,7 @@
 #include "Config.h"
 
 AlarmSystem::AlarmSystem(LEDController& activityLED, Buzzer& buzzer,
-                         AccelerometerSensor& accel, LD2420Sensor& presence)
+                         LIS2DW12Sensor& accel, LD2420Sensor& presence)
     : _activityLED(activityLED), _buzzer(buzzer), _accel(accel), 
       _presence(presence),
       _state(AlarmState::DISARMED), _previousState(AlarmState::DISARMED),

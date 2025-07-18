@@ -29,6 +29,7 @@ namespace Config {
     // Sensor Addresses
     constexpr uint8_t BME280_I2C_ADDR = 0x76;
     constexpr uint8_t VEML7700_I2C_ADDR = 0x10;
+    constexpr uint8_t LIS2DW12_I2C_ADDR = 0x19;
 
     // Sensor Configuration
     constexpr uint16_t MIC_SAMPLE_RATE = 16000;

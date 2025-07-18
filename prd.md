@@ -121,7 +121,15 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - Device is USB-powered; battery optimization not required.
 - Use best-in-class libraries for MQTT, WiFiManager, Preferences.
 - Sensor polling and debounce logic must be efficient.
-- Update the platform.ini file to contain all the used external libraries
+- Update the platform.ini file to contain all the used external libraries.
+- Buzzer needs PWM signal to be driven.
+- Microphone is an analog MEMS microphone, it requires no clock and connects directly to an analog-to-digital converter (ADC) pin on your ESP32
+
+| Sensor Data               | I2C address |
+|---------------------------|-------------|
+| BME280                    | 0x76     |
+| VEML7700                  | 0x10     |
+| ST LIS2DW12TR             | 0x19     |
 
 ## Success Metrics
 

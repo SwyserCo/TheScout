@@ -4,7 +4,7 @@
 #include <ArduinoJson.h>
 #include "utility/LEDController.h"
 #include "utility/Buzzer.h"
-#include "sensors/AccelerometerSensor.h"
+#include "sensors/LIS2DW12Sensor.h"
 #include "sensors/LD2420Sensor.h"
 
 enum class AlarmState {
@@ -17,7 +17,7 @@ enum class AlarmState {
 class AlarmSystem {
 public:
     AlarmSystem(LEDController& activityLED, Buzzer& buzzer,
-                AccelerometerSensor& accel, LD2420Sensor& presence);
+                LIS2DW12Sensor& accel, LD2420Sensor& presence);
     
     void begin();
     void update();
@@ -34,7 +34,7 @@ public:
 private:
     LEDController& _activityLED;
     Buzzer& _buzzer;
-    AccelerometerSensor& _accel;
+    LIS2DW12Sensor& _accel;
     LD2420Sensor& _presence;
     
     AlarmState _state;
