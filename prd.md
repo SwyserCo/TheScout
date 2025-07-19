@@ -2,20 +2,25 @@
 
 ## 1. Project Overview
 
-This document provides the central technical specifications for "The Scout," a multi-sensor IoT device for the Guardian Home Security system. It serves as the primary source of truth for hardware details, software architecture, and the development roadmap.
+This document provides the central technical specifications for "The Scout," a multi-sensor IoT device. It serves as the primary source of truth for hardware details, software architecture, and the development roadmap.
 
-This master document should be used in conjunction with the phased PRD files, which outline the specific development steps.
+### Branding & Theme
+* **Product Line:** Guardian
+* **Device Name:** The Scout
+* **Theme:** Medieval. This theme should influence naming conventions (e.g., device names like "The Keep", "The Scout", power supplies like "Hearthstone") and user feedback (e.g., using musical "chimes" for the buzzer instead of generic beeps).
 
 ---
 
 ## 2. Software Architecture & Principles
 
 ### Core Principle: Modularity
-All firmware development **must** be modular. Functionality should be encapsulated within separate classes (e.g., `LEDController`, `SensorManager`, `MQTTHandler`). This ensures code is reusable, testable, and easy to maintain. Avoid placing complex logic directly in the main `loop()` function.
+All firmware development **must** be modular. Functionality should be encapsulated within separate classes (e.g., `Feedback`, `Network`, `Sensors`). This ensures code is reusable, testable, and easy to maintain. Avoid placing complex logic directly in the main `loop()` function.
+
+### Library Management
+Third-party libraries are managed by PlatformIO and located in the `lib/` folder. You **must not** modify the source code of these libraries. If a library's functionality needs to be extended or adapted, create a "wrapper" class within our own `src/modules` directory that uses the library's public API. Do not alter the original library files.
 
 ### Project Folder Structure
-All code must adhere to the standard PlatformIO source file organization. This structure separates interface (`.h`) from implementation (`.cpp`) and groups related modules into logical directories.
-
+All code must adhere to the standard PlatformIO source file organization.
 
 * **project/**
     * `platformio.ini`
@@ -36,7 +41,6 @@ All code must adhere to the standard PlatformIO source file organization. This s
             * `Network.cpp`
             * `Sensors.cpp`
             * `Mqtt.cpp`
-
 
 ---
 
@@ -107,6 +111,6 @@ The firmware for The Scout will be developed in four distinct, sequential phases
 ---
 
 ### Instructions for Copilot:
-1.  Always refer to **this master document** for all architectural principles, pin numbers, I2C addresses, and MQTT broker details.
+1.  Always refer to **this master document** for all architectural principles, hardware specifications, and the development roadmap.
 2.  Tackle the development roadmap **one phase at a time**, using the specific PRD file for each phase to guide code generation.
 3.  Do not proceed to the next phase until the requirements for the current phase are met and verified.

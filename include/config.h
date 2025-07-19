@@ -28,6 +28,21 @@ namespace Config {
     // Buzzer Pin
     constexpr uint8_t BUZZER_PIN = 40;         // IO40 - Buzzer (PWM capable)
     
+    // Factory Reset Button
+    constexpr uint8_t FACTORY_RESET_PIN = 2;   // IO02 - Factory reset button
+    
+    // WiFi Configuration
+    namespace WiFi {
+        constexpr char AP_SSID[] = "TheScout";              // Access Point SSID
+        constexpr char AP_IP[] = "192.168.10.40";           // Captive portal IP
+        constexpr uint16_t AP_PORT = 80;                     // Web server port
+        constexpr uint32_t CONNECTION_TIMEOUT_MS = 10000;    // WiFi connection timeout
+        constexpr uint32_t RETRY_INTERVAL_FAST_MS = 30000;   // Fast retry interval (30s)
+        constexpr uint32_t RETRY_INTERVAL_SLOW_MS = 300000;  // Slow retry interval (5 min)
+        constexpr uint8_t MAX_FAST_RETRIES = 5;              // Max fast retries before slowing down
+        constexpr uint32_t CREDENTIALS_CHECK_INTERVAL = 1000; // How often to check stored credentials
+    }
+    
     // Serial Configuration
     constexpr uint32_t SERIAL_BAUD = 115200;
     

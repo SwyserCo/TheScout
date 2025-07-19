@@ -1,53 +1,83 @@
-# Product Requirements Document: The Scout - Phase 2
+# Product Requirements Document: The Scout - Phase 2 (Revision 3)
 
 ## 1. Phase Goal: Implement a Robust WiFi Manager
 
-The primary goal of this phase is to create a user-friendly and reliable WiFi setup mechanism for "The Scout" device. The device must be able to connect to a user's local WiFi network through a captive portal. This phase focuses exclusively on network connectivity and initial device configuration.
+The primary goal of this phase is to create a user-friendly and reliable WiFi setup mechanism for "The Scout" device. The device must be able to connect to a user's local WiFi network through a captive portal if and only if it has no credentials stored. If credentials are stored, it must attempt to connect indefinitely without starting the portal.
 
----
+## 2. Core Features & Logic
 
-## 2. Core Feature: Branded Captive Portal for WiFi Setup
+### A. Connection Logic Flow
+The device's startup and connection logic must follow this exact sequence:
 
-### User Story
-**As a new user**, I want to set up my Scout device easily by selecting my home WiFi network from a list and entering my password, so I can get it online without technical expertise or typing errors.
+1.  **Check for Credentials**: On boot, check the `Preferences` library for stored WiFi credentials.
+2.  **Scenario A: Credentials Exist**
+    * Attempt to connect to the stored WiFi network.
+    * **On Success**: Proceed to normal operation.
+    * **On Failure**: Begin the "Persistent Retry" strategy (see Section 2B). **Crucially, do not fall back to AP/Captive Portal mode.**
+3.  **Scenario B: No Credentials Exist**
+    * Immediately start the Captive Portal / AP Mode (see Section 2C).
 
-### Acceptance Criteria
-1.  **AP Mode Trigger**: On first boot, or if saved WiFi credentials fail to connect, the device must create its own WiFi Access Point (AP).
-    * The AP SSID should be `Guardian-Scout-Setup`.
-2.  **Automatic Captive Portal**: When a user connects to the `Guardian-Scout-Setup` AP with a phone or laptop, a captive portal should open automatically, directing them to the configuration page.
-3.  **Branded Configuration Page**: The web page must be visually appealing and clearly branded.
-    * **Header**: "Guardian Security System"
-    * **Sub-header**: "The Scout: Network Setup"
-    * **Introduction**: A brief (2-3 sentences) explanation, e.g., "Welcome! Let's get your Scout connected. Please select your home WiFi network from the list below and enter the password."
-    * **WiFi Scanning**: The device must perform a WiFi scan and dynamically populate a dropdown menu on the webpage with the SSIDs of all detected networks. This allows the user to select their network instead of typing the name manually.
-    * The page must provide a password input field. When a network is selected from the dropdown, its name should fill a (potentially read-only) SSID field.
-4.  **Credential Handling**:
-    * Upon submission, the device will attempt to connect to the selected WiFi network.
-    * The WiFi credentials (SSID and password) **must** be securely stored in the ESP32's non-volatile memory using the `Preferences` library.
-5.  **Unique Device ID**: After a successful first-time connection, the device must:
-    * Generate a unique `DeviceID`.
-    * The format must be `TheScout-XXXXXX`, where `XXXXXX` is a unique identifier (e.g., from the last 3 bytes of the MAC address).
-    * This `DeviceID` **must** also be saved using the `Preferences` library.
-6.  **User Feedback (Using Phase 1 Modules)**:
-    * **System LED (IO09)**:
-        * Use the `Feedback` module to show a *Pulsing Blue* pattern while in AP/Setup mode.
-        * Use the `Feedback` module to show a *Blinking Yellow* pattern while attempting to connect.
-        * Use the `Feedback` module to show a *Solid Green for 5 seconds* pattern on success.
-    * **Buzzer (IO40)**:
-        * Use the `Feedback` module to `playSuccessChime()` upon successful WiFi connection.
-        * Use the `Feedback` module to `playFailureTone()` if the connection fails.
-7.  **Success & Reboot**: After a successful connection, the device should display a success page ("Setup complete! Your Scout is now connected.") for 10 seconds and then reboot to begin normal operation.
+### B. Persistent Retry Strategy (For Saved Credentials)
+This strategy only applies if the device has successfully connected to a network at least once in the past and is now failing to reconnect.
 
----
+1.  **Initial Attempts**: Try to reconnect 5 times, with a 10-second delay between each attempt.
+2.  **Long-Term Attempts**: If the initial 5 attempts fail, switch to a long-delay retry strategy, attempting to reconnect once every 5 minutes.
 
-## 3. Technical Requirements & Implementation Strategy
+### C. Captive Portal / AP Mode
+This mode should only activate if no credentials are found in `Preferences`.
+
+#### C.1. Webpage User Interface & Functionality Requirements
+The captive portal page must be implemented with the following specific UI/UX features:
+
+1.  **Branding & Text**:
+    * **Main Header**: `The Scout`
+    * **Introductory Text**: Replace the sub-header with a short introduction. For example: "Welcome to your new Scout device. To get started, please select your home WiFi network from the list below and enter the password to bring it online."
+    * **Connect Button Text**: `Connect to Network`
+2.  **WiFi Network Selection**:
+    * **Automatic Scan**: On page load, the page must immediately display a "Scanning for networks..." loader overlay. The scan for WiFi networks must start automatically without requiring a button press.
+    * **Clean SSID List**: The page must use JavaScript to fetch a list of available SSIDs from a dedicated endpoint on the ESP32 (e.g., `/api/scan`). The server response must be processed to create a **clean, de-duplicated list showing only the SSID names**. This list populates a dropdown menu (`<select>` element).
+3.  **Password Input**:
+    * The password field must include a button or icon that, when pressed, toggles the input field's type between `password` and `text` to allow the user to check their entry.
+4.  **Button State**:
+    * The "Connect to Network" button must be disabled by default.
+    * It should only become enabled after the user has selected a network from the dropdown list.
+
+#### C.2. Visual Target
+The final rendered webpage should look exactly like this screenshot.
+
+![Captive Portal UI Target](images/captive_portal_target.png)
+*(Note: You will need to create this screenshot and place it in an `images` folder in your project for this link to work.)*
+
+#### C.3. Webpage Post-Submission Flow
+1.  After the user clicks "Connect to Network," the device should serve a new page with a "Connecting... Please wait." message.
+2.  **On First-Time Success**: The device saves the credentials and reboots into normal operation.
+3.  **On First-Time Failure**: If the connection fails during this initial setup, the device must **not** enter the persistent retry loop. Instead, it must immediately restart the AP and return the user to the initial configuration page with an error message (e.g., "Connection failed. Please check the password and try again.").
+
+### D. Credential & Device Name Management
+1.  **Storage**: All credentials and the device name **must** be stored using the `Preferences` library.
+2.  **Device Name Generation**: During the very first successful setup via the captive portal, the device must:
+    * Check if a device name already exists in `Preferences`.
+    * If not, generate a unique device name in the format `TheScout-XXXXXX`, where `XXXXXX` is a random 6-digit hexadecimal string.
+    * Store this name in `Preferences`.
+
+### E. User Feedback (Integration with Phase 1 Modules)
+The `Feedback` module must be used to provide clear status indications:
+
+| State                               | System LED (IO09) Pattern         | Buzzer Action                       |
+| ----------------------------------- | --------------------------------- | ----------------------------------- |
+| In AP / Captive Portal Mode         | Pulsing Blue                      | None                                |
+| Connecting (with saved credentials) | Flashing Blue                     | None                                |
+| Connection Succeeded                | Flash Green twice                 | `playSuccessChime()`                |
+| Connection Failed (with credentials)| Flash Red twice (at end of 5 tries) | `playFailureTone()` (at end of 5 tries) |
+
+## 3. Deferred Functionality
+
+* **Factory Reset**: The logic for the factory reset button (IO02) is **out of scope** for this phase and will be implemented later.
+
+## 4. Technical Requirements & Implementation Strategy
 
 ### Instructions for Copilot:
-1.  **Integrate Phase 1 Modules**: You must `#include` and use the `Feedback` module created in Phase 1 to provide user feedback.
-2.  **Use Specified Libraries**:
-    * `WiFi.h`, `WebServer.h`, `DNSServer.h` for the captive portal functionality.
-    * `Preferences.h` for storing all configuration data (WiFi credentials, DeviceID).
-3.  **Code Structure**:
-    * Create a dedicated `Network` module (`Network.h`/`.cpp`) to encapsulate all setup logic.
-    * The HTML/CSS for the web page should be stored in a separate `.h` file as a `const char[]` PROGMEM variable. This HTML must include JavaScript to fetch the list of WiFi networks from a specific endpoint (e.g., `/scan`) and populate the dropdown.
-4.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to confirm the captive portal works, it correctly lists nearby WiFi networks, and the device successfully connects after submission.
+1.  **Implement the Logic Flow**: Adhere strictly to the connection and failure logic defined in Sections 2A, 2B, and 2C.3.
+2.  **Web Server Endpoints**: The web server must handle requests for `/`, `/api/scan`, and the form submission. The `/api/scan` endpoint must return a JSON array of unique SSID strings.
+3.  **Code Structure**: Create a dedicated `Network` module (`Network.h`/`.cpp`) to encapsulate all setup and connection logic. The HTML, CSS, and JavaScript for the portal should be in a separate `.h` file.
+4.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to confirm all UI elements and logic flows work exactly as described.
