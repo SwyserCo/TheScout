@@ -1,51 +1,53 @@
 # Product Requirements Document: The Scout - Phase 2
 
-## 1. Phase Goal: Initialize and Read All Onboard Sensors
+## 1. Phase Goal: Implement a Robust WiFi Manager
 
-With WiFi connectivity established, the goal of this phase is to bring the device's sensors to life. This involves writing stable, non-blocking code to initialize each sensor and read data from it periodically. The data will be stored in memory for now, in preparation for MQTT transmission in the next phase.
+The primary goal of this phase is to create a user-friendly and reliable WiFi setup mechanism for "The Scout" device. The device must be able to connect to a user's local WiFi network through a captive portal. This phase focuses exclusively on network connectivity and initial device configuration.
 
 ---
 
-## 2. Core Features: Sensor Management and Data Acquisition
+## 2. Core Feature: Branded Captive Portal for WiFi Setup
 
 ### User Story
-**As a developer**, I want to create a modular and efficient system to manage all of The Scout's sensors, so that I can reliably read data from them without impacting the device's responsiveness.
+**As a new user**, I want to set up my Scout device easily by selecting my home WiFi network from a list and entering my password, so I can get it online without technical expertise or typing errors.
 
 ### Acceptance Criteria
-1.  **Sensor Manager**:
-    * Create a central `SensorManager` class responsible for initializing and periodically reading data from all sensors.
-    * This class should have a public method, e.g., `update()`, that is called in the main `loop()`. This method will internally manage the polling for each sensor using a non-blocking `millis()` timer.
-2.  **I2C Sensor Integration**:
-    * The I2C bus (SDA: IO17, SCL: IO18) must be initialized.
-    * **BME280 (0x76)**: Read temperature, humidity, and pressure. **Polling Frequency**: No more than once every 10 seconds.
-    * **VEML7700 (0x10)**: Read ambient light (lux). **Polling Frequency**: No more than once every 5 seconds.
-    * **LIS2DW12TR (0x19)**: This sensor is for **tamper detection**, not precise orientation.
-        * Configure the sensor to generate an interrupt on the `INT` pin (IO10) when significant motion (a "jolt" or "tap") is detected.
-        * Create a function that sets a boolean flag (e.g., `tamperDetected = true;`) when this interrupt is triggered.
-3.  **UART Sensor Integration**:
-    * **LD2420 (RX: IO15, TX: IO16)**: Initialize the mmWave sensor.
-        * Read presence detection data (e.g., still, moving, or no presence).
-        * The state should be stored in a simple variable (e.g., an `enum`).
-4.  **Analog Sensor Integration**:
-    * **MEMS Microphone (IO41)**:
-        * The goal is to detect loud noises, not perform complex audio analysis.
-        * Implement a function to read the analog value from the microphone.
-        * If the reading exceeds a predefined threshold for a short duration, set a boolean flag (e.g., `loudNoiseDetected = true;`).
-5.  **GPIO Control**:
-    * **Relay (IO12)**: Implement a class or functions to control the relay. It should have simple `on()`, `off()`, and `toggle()` methods.
-6.  **User Feedback**:
-    * **Activity LED (IO48)**: This LED should provide visual confirmation that sensors are being read.
-        * Blink the Activity LED briefly every time the `SensorManager` completes a full cycle of sensor reads.
+1.  **AP Mode Trigger**: On first boot, or if saved WiFi credentials fail to connect, the device must create its own WiFi Access Point (AP).
+    * The AP SSID should be `Guardian-Scout-Setup`.
+2.  **Automatic Captive Portal**: When a user connects to the `Guardian-Scout-Setup` AP with a phone or laptop, a captive portal should open automatically, directing them to the configuration page.
+3.  **Branded Configuration Page**: The web page must be visually appealing and clearly branded.
+    * **Header**: "Guardian Security System"
+    * **Sub-header**: "The Scout: Network Setup"
+    * **Introduction**: A brief (2-3 sentences) explanation, e.g., "Welcome! Let's get your Scout connected. Please select your home WiFi network from the list below and enter the password."
+    * **WiFi Scanning**: The device must perform a WiFi scan and dynamically populate a dropdown menu on the webpage with the SSIDs of all detected networks. This allows the user to select their network instead of typing the name manually.
+    * The page must provide a password input field. When a network is selected from the dropdown, its name should fill a (potentially read-only) SSID field.
+4.  **Credential Handling**:
+    * Upon submission, the device will attempt to connect to the selected WiFi network.
+    * The WiFi credentials (SSID and password) **must** be securely stored in the ESP32's non-volatile memory using the `Preferences` library.
+5.  **Unique Device ID**: After a successful first-time connection, the device must:
+    * Generate a unique `DeviceID`.
+    * The format must be `TheScout-XXXXXX`, where `XXXXXX` is a unique identifier (e.g., from the last 3 bytes of the MAC address).
+    * This `DeviceID` **must** also be saved using the `Preferences` library.
+6.  **User Feedback (Using Phase 1 Modules)**:
+    * **System LED (IO09)**:
+        * Use the `Feedback` module to show a *Pulsing Blue* pattern while in AP/Setup mode.
+        * Use the `Feedback` module to show a *Blinking Yellow* pattern while attempting to connect.
+        * Use the `Feedback` module to show a *Solid Green for 5 seconds* pattern on success.
+    * **Buzzer (IO40)**:
+        * Use the `Feedback` module to `playSuccessChime()` upon successful WiFi connection.
+        * Use the `Feedback` module to `playFailureTone()` if the connection fails.
+7.  **Success & Reboot**: After a successful connection, the device should display a success page ("Setup complete! Your Scout is now connected.") for 10 seconds and then reboot to begin normal operation.
 
 ---
 
 ## 3. Technical Requirements & Implementation Strategy
 
 ### Instructions for Copilot:
-1.  **Strategize First**: Outline your plan. For example: "I will create a `SensorManager` class. Inside it, I will instantiate objects for each sensor. The `update()` method will use `millis()` timers to check if it's time to poll each sensor. I will use the libraries specified in the original PRD."
-2.  **Find Better Libraries**: For the specified sensors, please search for the most robust and well-maintained Arduino libraries. If you find a better alternative to the ones in the original PRD, suggest it and explain why it's better.
-3.  **Best Practices**:
-    * Follow the file structure outlined in `copilot-instructions.md`, creating separate `.h` and `.cpp` files for each sensor driver or logical component.
-    * All sensor reading logic **must** be non-blocking.
-    * For the accelerometer, research the LIS2DW12's "tap detection" or "activity detection" features to implement the interrupt-driven tamper alert efficiently.
-4.  **Verification**: At the end of this phase, the code must compile successfully. Using the Serial Monitor, print the sensor readings as they are updated to verify that all components are working correctly.
+1.  **Integrate Phase 1 Modules**: You must `#include` and use the `Feedback` module created in Phase 1 to provide user feedback.
+2.  **Use Specified Libraries**:
+    * `WiFi.h`, `WebServer.h`, `DNSServer.h` for the captive portal functionality.
+    * `Preferences.h` for storing all configuration data (WiFi credentials, DeviceID).
+3.  **Code Structure**:
+    * Create a dedicated `Network` module (`Network.h`/`.cpp`) to encapsulate all setup logic.
+    * The HTML/CSS for the web page should be stored in a separate `.h` file as a `const char[]` PROGMEM variable. This HTML must include JavaScript to fetch the list of WiFi networks from a specific endpoint (e.g., `/scan`) and populate the dropdown.
+4.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to confirm the captive portal works, it correctly lists nearby WiFi networks, and the device successfully connects after submission.

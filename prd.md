@@ -2,13 +2,45 @@
 
 ## 1. Project Overview
 
-This document provides the central technical specifications for "The Scout," a multi-sensor IoT device for the Guardian Home Security system. It serves as the primary source of truth for hardware details like pin mappings, component addresses, and network configuration.
+This document provides the central technical specifications for "The Scout," a multi-sensor IoT device for the Guardian Home Security system. It serves as the primary source of truth for hardware details, software architecture, and the development roadmap.
 
 This master document should be used in conjunction with the phased PRD files, which outline the specific development steps.
 
 ---
 
-## 2. Hardware & Network Specifications
+## 2. Software Architecture & Principles
+
+### Core Principle: Modularity
+All firmware development **must** be modular. Functionality should be encapsulated within separate classes (e.g., `LEDController`, `SensorManager`, `MQTTHandler`). This ensures code is reusable, testable, and easy to maintain. Avoid placing complex logic directly in the main `loop()` function.
+
+### Project Folder Structure
+All code must adhere to the standard PlatformIO source file organization. This structure separates interface (`.h`) from implementation (`.cpp`) and groups related modules into logical directories.
+
+
+* **project/**
+    * `platformio.ini`
+    * **lib/**
+    * **include/**
+        * `config.h`
+        * `...`
+        * **modules/**
+            * `Feedback.h`
+            * `Network.h`
+            * `Sensors.h`
+            * `Mqtt.h`
+    * **src/**
+        * `main.cpp`
+        * `...`
+        * **modules/**
+            * `Feedback.cpp`
+            * `Network.cpp`
+            * `Sensors.cpp`
+            * `Mqtt.cpp`
+
+
+---
+
+## 3. Hardware & Network Specifications
 
 This section contains all fixed hardware and network configuration details.
 
@@ -52,25 +84,29 @@ This section contains all fixed hardware and network configuration details.
 
 ---
 
-## 3. Development Roadmap
+## 4. Development Roadmap
 
-The firmware for The Scout will be developed in three distinct, sequential phases. Use the corresponding PRD file for the detailed requirements of each phase.
+The firmware for The Scout will be developed in four distinct, sequential phases. Use the corresponding PRD file for the detailed requirements of each phase.
 
-### Phase 1: WiFi Setup & Connectivity
+### Phase 1: User Feedback Modules (LED & Buzzer)
+* **Goal**: Create non-blocking controllers for visual and audible feedback.
+* **Reference File**: `PRD_Phase1_Feedback.md`
+
+### Phase 2: WiFi Setup & Connectivity
 * **Goal**: Implement a robust, user-friendly captive portal for initial WiFi configuration.
-* **Reference File**: `PRD_Phase1_WiFi.md`
+* **Reference File**: `PRD_Phase2_WiFi.md`
 
-### Phase 2: Sensor Integration & Data Acquisition
-* **Goal**: Initialize all onboard sensors and reliably read data from them in a non-blocking manner.
-* **Reference File**: `PRD_Phase2_Sensors.md`
+### Phase 3: Sensor Integration & Data Acquisition
+* **Goal**: Initialize all onboard sensors and reliably read data from them.
+* **Reference File**: `PRD_Phase3_Sensors.md`
 
-### Phase 3: MQTT Integration & Home Assistant Discovery
+### Phase 4: MQTT Integration & Home Assistant Discovery
 * **Goal**: Publish sensor data to the MQTT broker and enable auto-discovery in Home Assistant.
-* **Reference File**: `PRD_Phase3_MQTT.md`
+* **Reference File**: `PRD_Phase4_MQTT.md`
 
 ---
 
 ### Instructions for Copilot:
-1.  Always refer to **this master document** for all pin numbers, I2C addresses, and MQTT broker details.
+1.  Always refer to **this master document** for all architectural principles, pin numbers, I2C addresses, and MQTT broker details.
 2.  Tackle the development roadmap **one phase at a time**, using the specific PRD file for each phase to guide code generation.
 3.  Do not proceed to the next phase until the requirements for the current phase are met and verified.

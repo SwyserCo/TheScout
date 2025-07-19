@@ -1,50 +1,49 @@
 # Product Requirements Document: The Scout - Phase 3
 
-## 1. Phase Goal: Integrate with Home Assistant via MQTT
+## 1. Phase Goal: Initialize and Read All Onboard Sensors
 
-With the device connected to WiFi and sensors providing data, the final phase is to publish this information to an MQTT broker and enable seamless integration with Home Assistant using its MQTT Discovery protocol.
+With WiFi connectivity established, the goal of this phase is to bring the device's sensors to life. This involves writing stable, non-blocking code to initialize each sensor and read data from it periodically. The data will be stored in memory for now, in preparation for MQTT transmission in the next phase.
 
 ---
 
-## 2. Core Features: MQTT Communication and Home Assistant Discovery
+## 2. Core Features: Sensor Management and Data Acquisition
 
 ### User Story
-**As a Home Assistant user**, I want The Scout to automatically appear in my Home Assistant instance with all its sensors and controls, so I can easily monitor my home and create automations.
+**As a developer**, I want to create a modular and efficient system to manage all of The Scout's sensors, so that I can reliably read data from them without impacting the device's responsiveness.
 
 ### Acceptance Criteria
-1.  **MQTT Connection**:
-    * The device must connect to the MQTT broker specified in the original PRD (`192.168.40.6:1883`).
-    * The `MQTT_CLIENT_ID` must be the unique `DeviceID` generated in Phase 1 (e.g., `TheScout-XXXXXX`).
-    * The device must handle MQTT disconnections gracefully and attempt to reconnect automatically.
-2.  **Home Assistant Discovery**:
-    * On first connect to the MQTT broker, the device must publish configuration payloads for each of its entities to the `homeassistant/` topic prefix. This will enable Home Assistant to automatically discover them.
-    * Refer to the official [Home Assistant MQTT Discovery documentation](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery) for the correct payload structure.
-3.  **Entity Publishing**:
-    * **Device Identity**: All entities must be linked to a single device in Home Assistant. The device configuration payload should include identifiers like `name`, `model` ("The Scout"), and `manufacturer` ("Guardian Security").
-    * **Sensor States**: The device must publish sensor data to unique state topics.
-        * **BME280**: Publish temperature, humidity, and pressure as separate sensor entities.
-        * **VEML7700**: Publish lux value as a sensor entity.
-        * **LD2420**: Publish presence as a `binary_sensor`. Payload should be `ON` for presence detected, `OFF` for no presence.
-        * **Accelerometer (Tamper)**: Publish tamper status as a `binary_sensor` with `device_class: motion` or `device_class: tamper`. It should be `ON` when the `tamperDetected` flag is true, and automatically reset to `OFF` after a few seconds.
-        * **Microphone (Noise)**: Publish noise status as a `binary_sensor` with `device_class: sound`. It should be `ON` when `loudNoiseDetected` is true, and automatically reset to `OFF`.
-    * **Relay Control**:
-        * The relay must be exposed as a `switch` entity.
-        * The device must subscribe to the switch's `command_topic`.
-        * It must change the relay's state immediately upon receiving a command (`ON` or `OFF`) from Home Assistant.
-        * It must publish the relay's actual state to the `state_topic`.
-4.  **Documentation Generation**:
-    * Create a separate Markdown file named `MQTT_API.md`.
-    * This file must document all MQTT topics the device uses. For each entity, it should list the discovery topic, state topic, and command topic (if applicable). This serves as a technical reference for debugging.
+1.  **Sensor Manager**:
+    * Create a central `Sensors` module (`Sensors.h`/`.cpp`) responsible for initializing and periodically reading data from all sensors.
+    * This class should have a public method, e.g., `update()`, that is called in the main `loop()`. This method will internally manage the polling for each sensor using a non-blocking `millis()` timer.
+2.  **I2C Sensor Integration**:
+    * The I2C bus (SDA: IO17, SCL: IO18) must be initialized.
+    * **BME280 (0x76)**: Read temperature, humidity, and pressure. **Polling Frequency**: No more than once every 10 seconds.
+    * **VEML7700 (0x10)**: Read ambient light (lux). **Polling Frequency**: No more than once every 5 seconds.
+    * **LIS2DW12TR (0x19)**: This sensor is for **tamper detection**, not precise orientation.
+        * Configure the sensor to generate an interrupt on the `INT` pin (IO10) when significant motion (a "jolt" or "tap") is detected.
+        * Create a function that sets a boolean flag (e.g., `tamperDetected = true;`) when this interrupt is triggered.
+3.  **UART Sensor Integration**:
+    * **LD2420 (RX: IO15, TX: IO16)**: Initialize the mmWave sensor.
+        * Read presence detection data (e.g., still, moving, or no presence).
+        * The state should be stored in a simple variable (e.g., an `enum`).
+4.  **Analog Sensor Integration**:
+    * **MEMS Microphone (IO41)**:
+        * The goal is to detect loud noises, not perform complex audio analysis.
+        * Implement a function to read the analog value from the microphone.
+        * If the reading exceeds a predefined threshold for a short duration, set a boolean flag (e.g., `loudNoiseDetected = true;`).
+5.  **GPIO Control**:
+    * **Relay (IO12)**: Implement functions within the `Sensors` module to control the relay. It should have simple `on()`, `off()`, and `toggle()` methods.
+6.  **User Feedback (Using Phase 1 Modules)**:
+    * **Activity LED (IO48)**: Use the `Feedback` module to blink the Activity LED briefly every time the `Sensors` module completes a full cycle of sensor reads.
 
 ---
 
 ## 3. Technical Requirements & Implementation Strategy
 
 ### Instructions for Copilot:
-1.  **Strategize First**: Outline your plan. For example: "I will create an `MQTTHandler` class. It will manage the connection, reconnections, and publishing of discovery payloads. It will have public methods like `publishSensorData()` and `publishRelayState()` that are called from the main loop."
-2.  **Library**: Use a robust MQTT client library like `PubSubClient`.
-3.  **JSON Payloads**: Use a lightweight JSON library like `ArduinoJson` to construct the discovery and state payloads. Pay close attention to the exact format required by Home Assistant.
-4.  **Topic Structure**: Define a clear topic structure. For example:
-    * **State**: `guardian/thescout/{DeviceID}/sensor/temperature/state`
-    * **Command**: `guardian/thescout/{DeviceID}/relay/command`
-5.  **Verification**: After this phase, the device should successfully connect to the MQTT broker. In Home Assistant (with MQTT configured), a new device called "The Scout" should appear automatically, with all its associated sensor and switch entities. Toggling the switch in Home Assistant should physically toggle the relay.
+1.  **Find Better Libraries**: For the specified sensors, please search for the most robust and well-maintained Arduino libraries. If you find a better alternative to the ones in the original PRD, suggest it and explain why it's better.
+2.  **Best Practices**:
+    * Follow the modular folder structure defined in `Master_PRD.md`.
+    * All sensor reading logic **must** be non-blocking.
+    * For the accelerometer, research the LIS2DW12's "tap detection" or "activity detection" features to implement the interrupt-driven tamper alert efficiently.
+3.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to print sensor readings to the Serial Monitor to verify they are working correctly. The Activity LED should be blinking.

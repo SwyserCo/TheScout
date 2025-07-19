@@ -1,55 +1,48 @@
 # Product Requirements Document: The Scout - Phase 1
 
-## 1. Phase Goal: Implement a Robust WiFi Manager
+## 1. Phase Goal: Implement User Feedback Modules
 
-The primary goal of this phase is to create a user-friendly and reliable WiFi setup mechanism for "The Scout" device. The device must be able to connect to a user's local WiFi network through a captive portal. This phase focuses exclusively on network connectivity and initial device configuration.
+The primary goal of this phase is to create robust, non-blocking software modules to control the onboard LEDs and the passive buzzer. These modules will provide the foundational user feedback mechanisms required for all subsequent development phases.
 
 ---
 
-## 2. Core Feature: Branded Captive Portal for WiFi Setup
+## 2. Core Features: LED and Buzzer Controllers
 
 ### User Story
-**As a new user**, I want to set up my Scout device easily by connecting it to my home WiFi network, so I can get it online without needing technical expertise or a computer.
+**As a developer**, I need reusable, non-blocking classes to control LEDs and the buzzer, so I can easily provide clear status feedback to the user throughout the device's operation.
 
 ### Acceptance Criteria
-1.  **AP Mode Trigger**: On first boot, or if saved WiFi credentials fail to connect, the device must create its own WiFi Access Point (AP).
-    * The AP SSID should be `Guardian-Scout-Setup`.
-2.  **Automatic Captive Portal**: When a user connects to the `Guardian-Scout-Setup` AP with a phone or laptop, a captive portal should open automatically, directing them to the configuration page.
-3.  **Branded Configuration Page**: The web page must be visually appealing and clearly branded.
-    * **Header**: "Guardian Security System"
-    * **Sub-header**: "The Scout: Network Setup"
-    * **Introduction**: A brief (2-3 sentences) explanation, e.g., "Welcome! Let's get your Scout connected. Please select your home WiFi network from the list below and enter the password."
-    * The page must automatically scan for and list available WiFi networks.
-    * It must provide input fields for the selected SSID and password.
-4.  **Credential Handling**:
-    * Upon submission, the device will attempt to connect to the selected WiFi network.
-    * The WiFi credentials (SSID and password) **must** be securely stored in the ESP32's non-volatile memory using the `Preferences` library.
-5.  **Unique Device ID**: After a successful first-time connection, the device must:
-    * Generate a unique `DeviceID`.
-    * The format must be `TheScout-XXXXXX`, where `XXXXXX` is a unique identifier (e.g., from the last 3 bytes of the MAC address).
-    * This `DeviceID` **must** also be saved using the `Preferences` library.
-6.  **User Feedback**:
-    * **System LED (IO09)**:
-        * *Pulsing Blue*: Device is in AP/Setup mode.
-        * *Blinking Yellow*: Attempting to connect to the user's WiFi.
-        * *Solid Green (for 5 seconds)*: Successfully connected.
-    * **Buzzer (IO40)**:
-        * Play a short, pleasant "success" chime upon successful WiFi connection.
-        * Play a distinct "failure" tone if the connection fails, after which it should revert to AP mode.
-7.  **Success & Reboot**: After a successful connection, the device should display a success page ("Setup complete! Your Scout is now connected.") for 10 seconds and then reboot to begin normal operation.
+
+#### A. LED Controller Module
+1.  **Class Structure**: Create a class named `Feedback` (or similar, like `LEDController`) to manage all LED functionality.
+2.  **Initialization**: The controller should be initialized with the GPIO pins for the LEDs it will manage (e.g., `System LED` on IO09, `Activity LED` on IO48), as defined in `Master_PRD.md`.
+3.  **Non-Blocking Operation**: All pattern-based methods (`blink`, `pulse`) must be non-blocking. The class must have an `update()` method that is called in the main `loop()` to manage the timing.
+4.  **Required Methods**:
+    * `void on(int pin)`: Turn an LED on solid.
+    * `void off(int pin)`: Turn an LED off.
+    * `void blink(int pin, int interval)`: Blink an LED at a specified interval.
+    * `void pulse(int pin, int speed)`: Fade an LED on and off smoothly (PWM).
+5.  **Pre-defined Patterns for `System LED` (IO09)**:
+    * **Setup Mode**: Pulsing Blue (to be used in Phase 2).
+    * **Connecting**: Blinking Yellow (to be used in Phase 2).
+    * **Success**: Solid Green for 5 seconds, then off (to be used in Phase 2).
+
+#### B. Buzzer Controller Module
+1.  **Class Structure**: This functionality can be part of the same `Feedback` class or a separate `BuzzerController` class.
+2.  **Tone Generation via PWM**: To make the passive buzzer produce sound, it **must be driven by a PWM signal**. The controller must use the ESP32's `ledc` peripheral to generate PWM signals of specific frequencies on the buzzer pin (`IO40`). Each frequency corresponds to a different musical note.
+3.  **Non-Blocking Operation**: Playing a sequence of notes (a "chime") must be non-blocking. The class needs an `update()` method to be called in the main `loop()` to handle note durations and pauses.
+4.  **Required Methods**:
+    * `void playNote(int frequency, int duration)`: Play a single note for a set duration.
+    * `void playSuccessChime()`: Play a pleasant, ascending two-note chime (e.g., C5 then G5).
+    * `void playFailureTone()`: Play a low, descending two-note tone (e.g., G4 then C4).
+    * `void playResetChime()`: Play a short, single confirmation beep.
 
 ---
 
 ## 3. Technical Requirements & Implementation Strategy
 
 ### Instructions for Copilot:
-1.  **Strategize First**: Before writing code, please outline your plan. For example: "I will create a `WiFiSetupManager` class. This class will handle starting the AP, running the DNS and Web servers, rendering the HTML for the captive portal, and saving the credentials."
-2.  **Use Specified Libraries**:
-    * `WiFi.h`, `WebServer.h`, `DNSServer.h` for the captive portal functionality.
-    * `Preferences.h` for storing all configuration data (WiFi credentials, DeviceID).
-3.  **Code Structure**:
-    * Create a dedicated class (e.g., `WiFiSetupManager`) to encapsulate all setup logic.
-    * The HTML/CSS for the web page should be stored in a separate `.h` file as a `const char[]` PROGMEM variable to keep `main.cpp` clean.
-    * The code must be non-blocking. Do not use long `delay()` calls.
-4.  **Pin Definitions**: Use the provided pin map from `copilot-background.md` for the System LED and Buzzer.
-5.  **Verification**: At the end of this phase, the code must compile successfully using the `pio run` command. The primary test is to confirm the captive portal works as described and the device successfully connects to a network.
+1.  **Strategize First**: Outline your plan, e.g., "I will create a `Feedback` class in its own module (`Feedback.h`/`.cpp`). It will manage both LEDs and the Buzzer. The class will have an `update()` method to be called in the main loop to ensure non-blocking operation. For the buzzer, I will configure a `ledc` channel to generate tones."
+2.  **Code Structure**: Follow the modular folder structure defined in `Master_PRD.md`.
+3.  **Testing**: Create a `main.cpp` that demonstrates each function. For example, in `setup()`, call `playSuccessChime()`, and in `loop()`, make the System LED pulse and the Activity LED blink. This will allow for immediate testing on the hardware.
+4.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to physically see the LEDs perform their patterns and hear the buzzer play its tones as commanded.
