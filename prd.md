@@ -90,7 +90,7 @@ This section contains all fixed hardware and network configuration details.
 
 ## 4. Development Roadmap
 
-The firmware for The Scout will be developed in four distinct, sequential phases. Use the corresponding PRD file for the detailed requirements of each phase.
+The firmware for The Scout will be developed in five distinct, sequential phases. Use the corresponding PRD file for the detailed requirements of each phase.
 
 ### Phase 1: User Feedback Modules (LED & Buzzer)
 * **Goal**: Create non-blocking controllers for visual and audible feedback.
@@ -107,6 +107,10 @@ The firmware for The Scout will be developed in four distinct, sequential phases
 ### Phase 4: MQTT Integration & Home Assistant Discovery
 * **Goal**: Publish sensor data to the MQTT broker and enable auto-discovery in Home Assistant.
 * **Reference File**: `PRD_Phase4_MQTT.md`
+
+### Phase 5: Factory Reset
+* **Goal**: Implement a physical button trigger to erase all settings and return the device to its initial state.
+* **Reference File**: `PRD_Phase5_FactoryReset.md`
 
 ---
 

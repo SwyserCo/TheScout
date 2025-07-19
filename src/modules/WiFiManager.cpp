@@ -158,12 +158,10 @@ bool WiFiManager::connectToWiFi() {
     if (WiFi.getMode() == WIFI_AP) {
         Serial.println("Switching to AP+STA mode to maintain captive portal during connection");
         WiFi.mode(WIFI_AP_STA);
-        delay(100);
     } else {
         // If we have stored credentials and no AP, use STA mode only
         Serial.println("Using STA mode for stored credential connection");
         WiFi.mode(WIFI_STA);
-        delay(100);
     }
     
     WiFi.begin(storedSSID.c_str(), storedPassword.c_str());
@@ -246,9 +244,15 @@ String WiFiManager::generateDeviceName() {
 
 void WiFiManager::updateFeedback() {
     static WiFiState lastFeedbackState = WiFiState::CHECKING_CREDENTIALS;
+    static unsigned long lastLEDAction = 0;
+    static uint8_t flashCount = 0;
+    static bool flashOn = false;
     
     // Only update LED when state changes to avoid constant calls
     if (currentState != lastFeedbackState) {
+        flashCount = 0;
+        lastLEDAction = millis();
+        
         switch (currentState) {
             case WiFiState::CONNECTING:
                 // Flashing blue while connecting (per PRD)
@@ -263,30 +267,22 @@ void WiFiManager::updateFeedback() {
                 break;
                 
             case WiFiState::CONNECTED:
-                // Flash green twice when connected (per PRD) - but only once when state changes
-                if (lastFeedbackState != WiFiState::CONNECTED) {
-                    systemLED->setColor(Config::Colors::SUCCESS_GREEN);
-                    delay(200);
-                    systemLED->setOff();
-                    delay(100);
-                    systemLED->setColor(Config::Colors::SUCCESS_GREEN);
-                    delay(200);
-                    systemLED->setOff();
-                    Serial.println("LED: Green flash twice (connected)");
-                }
+                // Start green flash sequence (per PRD)
+                systemLED->setColor(Config::Colors::SUCCESS_GREEN);
+                flashOn = true;
+                flashCount = 1;
+                lastLEDAction = millis();
+                Serial.println("LED: Starting green flash sequence (connected)");
                 break;
                 
             case WiFiState::CONNECTION_FAILED:
                 // Only flash red if we've exhausted all retries (per PRD)
                 if (connectionAttempts >= Config::WiFi::MAX_FAST_RETRIES) {
                     systemLED->setColor(Config::Colors::DANGER_RED);
-                    delay(200);
-                    systemLED->setOff();
-                    delay(100);
-                    systemLED->setColor(Config::Colors::DANGER_RED);
-                    delay(200);
-                    systemLED->setOff();
-                    Serial.println("LED: Red flash twice (all retries exhausted)");
+                    flashOn = true;
+                    flashCount = 1;
+                    lastLEDAction = millis();
+                    Serial.println("LED: Starting red flash sequence (all retries exhausted)");
                 } else {
                     systemLED->setOff();
                     Serial.println("LED: Off (failed, will retry)");
@@ -298,6 +294,36 @@ void WiFiManager::updateFeedback() {
                 break;
         }
         lastFeedbackState = currentState;
+    }
+    
+    // Handle non-blocking flash sequences for connected/failed states
+    unsigned long currentTime = millis();
+    if ((currentState == WiFiState::CONNECTED || 
+         (currentState == WiFiState::CONNECTION_FAILED && connectionAttempts >= Config::WiFi::MAX_FAST_RETRIES)) 
+        && flashCount > 0 && flashCount <= 4) {
+        
+        if (flashOn && currentTime - lastLEDAction >= 200) {
+            // Turn off after 200ms
+            systemLED->setOff();
+            flashOn = false;
+            lastLEDAction = currentTime;
+        } else if (!flashOn && currentTime - lastLEDAction >= 100) {
+            // Check if we need another flash
+            if (flashCount == 1) {
+                // Second flash
+                CRGB color = (currentState == WiFiState::CONNECTED) ? 
+                    Config::Colors::SUCCESS_GREEN : Config::Colors::DANGER_RED;
+                systemLED->setColor(color);
+                flashOn = true;
+                flashCount = 2;
+                lastLEDAction = currentTime;
+            } else if (flashCount == 2) {
+                // Turn off after second flash
+                systemLED->setOff();
+                flashCount = 5; // Mark as complete
+                lastLEDAction = currentTime;
+            }
+        }
     }
 }
 
@@ -391,10 +417,7 @@ void WiFiManager::handleConnect() {
             // Send connecting page
             webServer.send(200, "text/html", getConnectingPage());
             
-            // Give web server time to send response
-            delay(100);
-            
-            // Start connection attempt
+            // Start connection attempt immediately - no delay needed
             currentState = WiFiState::CONNECTING;
             connectionAttempts = 0;
             connectToWiFi();
