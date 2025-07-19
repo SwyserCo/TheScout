@@ -1,153 +1,76 @@
-# Product Requirements Document: MQTT Integration for The Scout
+# Master Product Requirements Document: The Scout
 
-## Introduction
+## 1. Project Overview
 
-The Scout is a compact, sensor-rich device designed for home security and automation. This PRD defines the foundational firmware and MQTT integration required to connect The Scout to Home Assistant, enabling sensor data publishing, relay control, and user feedback via LEDs and buzzer. The goal is to create a plug-and-play experience for users while maintaining reliability and responsiveness.
+This document provides the central technical specifications for "The Scout," a multi-sensor IoT device for the Guardian Home Security system. It serves as the primary source of truth for hardware details like pin mappings, component addresses, and network configuration.
 
-## Goals
+This master document should be used in conjunction with the phased PRD files, which outline the specific development steps.
 
-- Enable seamless integration with Home Assistant via MQTT auto-discovery.
-- Support easy Wi-Fi setup using WiFiManager.
-- Offer clear user feedback through LEDs and buzzer.
-- Allow control of a physical relay for automating dumb devices.
-- Include factory reset functionality for recovery and reconfiguration.
+---
 
-## User Stories
+## 2. Hardware & Network Specifications
 
-### User Story 1: Wi-Fi Setup
-**As a homeowner**, I want to easily set up The Scout for use by connecting it to my Wi-Fi so I can start using it without technical knowledge.
+This section contains all fixed hardware and network configuration details.
 
-**Acceptance Criteria:**
-- Device enters AP mode if no Wi-Fi credentials are stored in Preferences
-- If user connects to AP with a phone, Captive Portal open automatically.
-- User is presented with a page that show "Guardian Security System" as a heading and "The Scout" as a main heading. The page also shows the user a short 3 to 5 sentence introduction on what this page is for.
-- User enters SSID and password.
-- Confirmation page is shown after submission.
-- The credentials are stored using the Preferences Library.
-- System LED flashes red during connection, green 3x on success.
-- Buzzer plays chime on successful connection.
-- Once connected, create a unique DeviceID starting with "TheScout-" and then a unique 6 digit number.
+### Pin Mapping
 
-### User Story 2: MQTT Integration
-**As a Home Assistant user**, I want The Scout to auto-discover and publish sensor data so I can use it in automations.
+| Function                  | GPIO Pin | Notes                               |
+|---------------------------|----------|-------------------------------------|
+| Factory Reset Button      | IO02     | Input, requires pull-up             |
+| System LED                | IO09     | Output, for system status           |
+| Accelerometer Interrupt   | IO10     | Input, for tamper detection         |
+| LD2420 Interrupt          | IO11     | Input, for presence detection       |
+| Relay Control             | IO12     | Output, to control the relay        |
+| Charged Status            | IO14     | Input, from BQ24074 charge manager  |
+| LD2420 RX                 | IO15     | Connects to LD2420 TX pin           |
+| LD2420 TX                 | IO16     | Connects to LD2420 RX pin           |
+| I2C SDA                   | IO17     | I2C Data Line                       |
+| I2C SCL                   | IO18     | I2C Clock Line                      |
+| USB D+                    | IO19     | For native USB (if used)            |
+| USB D-                    | IO20     | For native USB (if used)            |
+| Power Good                | IO21     | Input, from BQ24074 charge manager  |
+| Buzzer                    | IO40     | Output, requires PWM for tones      |
+| SPL Microphone            | IO41     | Analog Input (ADC)                  |
+| Activity LED              | IO48     | Output, for sensor activity         |
 
-**Acceptance Criteria:**
-- Device connects to MQTT broker mentioned below.
-- All sensors appear in Home Assistant via auto-discovery.
-- Sensor data updates in real time.
+### I2C Device Addresses
 
-### User Story 3: Relay Control
-**As a smart home enthusiast**, I want to control the relay from Home Assistant to automate dumb devices.
+| Sensor                    | I2C Address |
+|---------------------------|-------------|
+| BME280 (Temp/Hum/Press)   | 0x76        |
+| VEML7700 (Ambient Light)  | 0x10        |
+| LIS2DW12TR (Accelerometer)| 0x19        |
 
-**Acceptance Criteria:**
-- Relay appears as a switch entity in Home Assistant.
-- Relay toggles within 500ms of MQTT command.
+### MQTT Broker Configuration
 
-### User Story 4: Factory Reset
-**As a user**, I want to reset the device to factory settings using a physical button.
+| Parameter        | Value              |
+|------------------|--------------------|
+| MQTT_BROKER      | "192.168.40.6"     |
+| MQTT_PORT        | 1883               |
+| MQTT_USER        | "mqtt-user"        |
+| MQTT_PASSWORD    | "##DikTrill45"     |
 
-**Acceptance Criteria:**
-- Holding IO02 button for 5 seconds flashes System LED and plays a short chime.
-- Wi-Fi configuration is erased using PreferencesAPI.
-- Device reboots into setup mode.
+---
 
-## Functional Requirements
-- WiFiManager setup with captive portal and Preferences storage.
-- Unique device name generation starting with `TheScout-` and stored useing PreferencesAPI.
-- MQTT connection and auto-discovery for all sensors following: https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery
-- Sensor publishing:
-  - LD2420: presence detection
-  - Accelerometer: tamper detection (basic movement yes or no)
-  - BME280: temperature, humidity, pressure
-  - VEML7700: ambient light
-- Relay control via MQTT.
-- LED and buzzer feedback:
-  - System LED: flash when connecting to Wifi, flash green 2x when connected
-  - Buzzer: chimes for success, failure, timeout of wifi connection. REquires PWM
-- Factory reset when Factory Reset Button is held in for 5 seconds
-  - SystemLED flashes until 5 seconds is reached
-  - After 5 seconds, Wifi credentials and Unique Device Name are also cleared using PreferencesAPI
-  - the buzzer plays a chime to signal the the device has been reset
+## 3. Development Roadmap
 
+The firmware for The Scout will be developed in three distinct, sequential phases. Use the corresponding PRD file for the detailed requirements of each phase.
 
-## Non-Goals
+### Phase 1: WiFi Setup & Connectivity
+* **Goal**: Implement a robust, user-friendly captive portal for initial WiFi configuration.
+* **Reference File**: `PRD_Phase1_WiFi.md`
 
-- OTA updates
-- Bluetooth functionality
-- Cloud-based remote access
-- Encrypted MQTT communication
-- Custom Home Assistant dashboards
-- Unit tests
+### Phase 2: Sensor Integration & Data Acquisition
+* **Goal**: Initialize all onboard sensors and reliably read data from them in a non-blocking manner.
+* **Reference File**: `PRD_Phase2_Sensors.md`
 
-## Design Considerations
+### Phase 3: MQTT Integration & Home Assistant Discovery
+* **Goal**: Publish sensor data to the MQTT broker and enable auto-discovery in Home Assistant.
+* **Reference File**: `PRD_Phase3_MQTT.md`
 
-- **Captive portal**:
-  - Welcome screen with setup button
-  - Responsive design for mobile
-  - Confirmation page after setup
-- **LED feedback**:
-  - Clear status indication
-- **Buzzer feedback**:
-  - Predefined chimes for key events
-- **Home Assistant UX**:
-  - All entities clearly labeled
-  - Relay exposed as toggle switch
+---
 
-## Technical Considerations
-
-- It's best practice to separate declarations in header files (.h) from implementations in source files (.cpp)
-- Make sure you look at .github folder copilot-instructions.md and copilot-background.md files for more insights
-- ESP32-S3 is single-threaded; avoid blocking operations.
-- Device is USB-powered; battery optimization not required.
-- Use best-in-class libraries for MQTT, WiFiManager, Preferences.
-- Sensor polling and debounce logic must be efficient.
-- Update the platform.ini file to contain all the used external libraries.
-- Buzzer needs PWM signal to be driven.
-- Microphone is an analog MEMS microphone, it requires no clock and connects directly to an analog-to-digital converter (ADC) pin on your ESP32
-
-| Sensor Data               | I2C address |  Libraries  |
-|---------------------------|-------------|-------------|
-| BME280                    | 0x76        | [BME280](https://github.com/malokhvii-eduard/arduino-bme280) |
-| VEML7700                  | 0x10        | [VEML7700](https://github.com/adafruit/Adafruit_VEML7700) |
-| ST LIS2DW12TR             | 0x19        | [LIS2DW12TR](https://github.com/arraym/LIS2DW12-Arduino-Lib) |
-| LD2420                    | RX/TX       | [LD2420](https://github.com/phuongnamzz/HLK-LD2410S) |
-
-## Success Metrics
-
-- Sensors should be driven using Pin Map below
-- Setup time < 2 minutes
-- MQTT discovery within 10 seconds
-- Sensor accuracy ±5%
-- Relay toggles within 500ms
-- 100% feedback accuracy for LEDs and buzzer
-- sensor thresholds be configurable via MQTT
-
-## Pin Mapping
-- Please use the following pins.
-
-| Function                  | GPIO Pin |
-|---------------------------|----------|
-| Factory Reset Button      | IO02     |
-| LD2420 RX                 | IO15     |
-| LD2420 TX                 | IO16     |
-| I2C SDA                   | IO17     |
-| I2C SCL                   | IO18     |
-| USB D+                    | IO19     |
-| USB D-                    | IO20     |
-| System LED                | IO09     |
-| Accelerometer Interrupt   | IO10     |
-| LD2420 Interrupt          | IO11     |
-| Relay                     | IO12     |
-| Charged Status            | IO14     |
-| Power Good                | IO21     |
-| Activity LED              | IO48     |
-| SPL Microphone            | IO41     |
-| Buzzer                    | IO40     |
-
-
-## MQTT Broker
-- MQTT_BROKER      "192.168.40.6"
-- MQTT_PORT        1883
-- MQTT_USER        "mqtt-user"
-- MQTT_PASSWORD    "##DikTrill45"
-- MQTT_CLIENT_ID   *The Device Name that was created on wifi connect*
+### Instructions for Copilot:
+1.  Always refer to **this master document** for all pin numbers, I2C addresses, and MQTT broker details.
+2.  Tackle the development roadmap **one phase at a time**, using the specific PRD file for each phase to guide code generation.
+3.  Do not proceed to the next phase until the requirements for the current phase are met and verified.
