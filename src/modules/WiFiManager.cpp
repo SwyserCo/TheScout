@@ -33,6 +33,14 @@ void WiFiManager::begin() {
     // Check for stored credentials
     hasStoredCredentials = loadCredentials();
     
+    // Debug: show what credentials we found
+    if (hasStoredCredentials) {
+        Serial.println("Found stored WiFi credentials for SSID: " + storedSSID);
+        Serial.println("Password length: " + String(storedPassword.length()));
+    } else {
+        Serial.println("No stored credentials found");
+    }
+    
     if (hasStoredCredentials) {
         Serial.println("Found stored WiFi credentials");
         currentState = WiFiState::CONNECTING;
