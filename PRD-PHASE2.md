@@ -1,4 +1,4 @@
-# Product Requirements Document: The Scout - Phase 2 (Revision 3)
+# Product Requirements Document: The Scout - Phase 2 (Revision 5)
 
 ## 1. Phase Goal: Implement a Robust WiFi Manager
 
@@ -27,18 +27,20 @@ This strategy only applies if the device has successfully connected to a network
 This mode should only activate if no credentials are found in `Preferences`.
 
 #### C.1. Webpage User Interface & Functionality Requirements
-The captive portal page must be implemented with the following specific UI/UX features:
-
-1.  **Branding & Text**:
+1.  **Single-Page Application Flow**: The entire WiFi setup process must occur on a **single HTML page**. There must be **no page reloads or redirects** until the user submits the form.
+2.  **Branding & Text**:
     * **Main Header**: `The Scout`
     * **Introductory Text**: Replace the sub-header with a short introduction. For example: "Welcome to your new Scout device. To get started, please select your home WiFi network from the list below and enter the password to bring it online."
     * **Connect Button Text**: `Connect to Network`
-2.  **WiFi Network Selection**:
-    * **Automatic Scan**: On page load, the page must immediately display a "Scanning for networks..." loader overlay. The scan for WiFi networks must start automatically without requiring a button press.
-    * **Clean SSID List**: The page must use JavaScript to fetch a list of available SSIDs from a dedicated endpoint on the ESP32 (e.g., `/api/scan`). The server response must be processed to create a **clean, de-duplicated list showing only the SSID names**. This list populates a dropdown menu (`<select>` element).
-3.  **Password Input**:
+3.  **Loading Overlay & Automatic Scan**:
+    * **Appearance**: On page load, a full-screen, semi-transparent overlay (e.g., `rgba(0, 0, 0, 0.7)`) must immediately appear.
+    * **Content**: Centered within the overlay, there must be an animated, spinning loader icon (themed with an orange color) and the text "Scanning for networks...<br>Please wait...".
+    * **Behavior**: This overlay is displayed while the initial, automatic network scan is in progress. JavaScript will automatically call an API endpoint on the ESP32 (e.g., `/api/scan`) to fetch the list of networks. Once the call completes (successfully or with an error), the overlay must smoothly fade out, revealing the form.
+4.  **WiFi Network Selection**:
+    * **Clean SSID List**: The `/api/scan` endpoint must return a clean, de-duplicated JSON array of SSID strings. The JavaScript will parse this array and dynamically populate the dropdown menu.
+5.  **Password Input**:
     * The password field must include a button or icon that, when pressed, toggles the input field's type between `password` and `text` to allow the user to check their entry.
-4.  **Button State**:
+6.  **Button State**:
     * The "Connect to Network" button must be disabled by default.
     * It should only become enabled after the user has selected a network from the dropdown list.
 

@@ -54,7 +54,8 @@ public:
     void update();           // Non-blocking update - call in loop()
     void beep(unsigned long beepDuration, uint16_t frequency = 1000);
     void playMelody(const Note* melody, uint8_t length);
-    void playConnectSuccess();   // Plays WiFi connect success chime
+    void playConnectSuccess();   // Plays WiFi connect success melody (elaborate)
+    void playSuccessChime();     // Plays simple success chime (per PRD)
     void playConnectFailed();    // Plays WiFi connect failed chime
     void playStartup();          // Plays device startup chime
     void stop();

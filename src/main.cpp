@@ -33,10 +33,7 @@ void setup() {
     
     Serial.println("Hardware initialized successfully");
     
-    // Play startup chime
-    buzzer.playStartup();
-    
-    // Initialize WiFi manager
+    // Initialize WiFi manager (will handle its own feedback)
     wifiManager.begin();
     
     Serial.println("TheScout Guard System Ready - Phase 2");

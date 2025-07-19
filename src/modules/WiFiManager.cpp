@@ -37,16 +37,21 @@ void WiFiManager::begin() {
     if (hasStoredCredentials) {
         Serial.println("Found stored WiFi credentials for SSID: " + storedSSID);
         Serial.println("Password length: " + String(storedPassword.length()));
+        
+        // For debugging - you can uncomment this line to clear credentials
+        // clearCredentials();
+        // hasStoredCredentials = false;
+        // Serial.println("DEBUG: Credentials cleared for testing");
     } else {
         Serial.println("No stored credentials found");
     }
     
     if (hasStoredCredentials) {
-        Serial.println("Found stored WiFi credentials");
+        Serial.println("Starting with stored credentials - attempting connection");
         currentState = WiFiState::CONNECTING;
         connectToWiFi();
     } else {
-        Serial.println("No stored credentials found");
+        Serial.println("No stored credentials - starting captive portal");
         currentState = WiFiState::AP_MODE;
         startAccessPoint();
     }
@@ -55,8 +60,14 @@ void WiFiManager::begin() {
 void WiFiManager::update() {
     unsigned long currentTime = millis();
     
-    // Handle DNS requests in AP mode
+    // Handle DNS requests and web server in AP mode
     if (currentState == WiFiState::AP_MODE) {
+        dnsServer.processNextRequest();
+        webServer.handleClient();
+    }
+    
+    // Handle web server in connecting state too (for status pages)
+    if (currentState == WiFiState::CONNECTING && WiFi.getMode() == WIFI_AP_STA) {
         dnsServer.processNextRequest();
         webServer.handleClient();
     }
@@ -67,23 +78,20 @@ void WiFiManager::update() {
     switch (currentState) {
         case WiFiState::CONNECTING:
             if (WiFi.status() == WL_CONNECTED) {
-                currentState = WiFiState::CONNECTED;
-                hasEverConnected = true; // Mark that we've successfully connected
                 Serial.println("WiFi connected successfully!");
                 Serial.println("IP: " + WiFi.localIP().toString());
                 
-                // Play success chime and flash green
-                buzzer->playConnectSuccess();
-                systemLED->setColor(Config::Colors::SUCCESS_GREEN);
-                delay(200);
-                systemLED->setOff();
-                delay(100);
-                systemLED->setColor(Config::Colors::SUCCESS_GREEN);
-                delay(200);
-                systemLED->setColor(Config::Colors::TORCH_ORANGE);
+                // Stop AP mode and web server completely
+                stopAccessPoint();
                 
-                // Stop DNS server since we're no longer in AP mode
-                dnsServer.stop();
+                // Update state first
+                currentState = WiFiState::CONNECTED;
+                hasEverConnected = true; // Mark that we've successfully connected
+                
+                // Play success feedback (per PRD)
+                buzzer->playSuccessChime();
+                
+                // LED feedback will be handled by updateFeedback()
                 
             } else if (currentTime - lastConnectionAttempt > Config::WiFi::CONNECTION_TIMEOUT_MS) {
                 // Connection timeout
@@ -92,19 +100,12 @@ void WiFiManager::update() {
                 currentState = WiFiState::CONNECTION_FAILED;
                 connectionAttempts++;
                 
-                // Only play failure feedback if we've reached max fast retries
+                // Only play failure feedback if we've reached max fast retries (per PRD)
                 if (connectionAttempts >= Config::WiFi::MAX_FAST_RETRIES) {
                     Serial.println("Max retries reached, playing failure feedback");
                     buzzer->playConnectFailed();
-                    systemLED->setColor(Config::Colors::DANGER_RED);
-                    delay(200);
-                    systemLED->setOff();
-                    delay(100);
-                    systemLED->setColor(Config::Colors::DANGER_RED);
-                    delay(200);
-                    systemLED->setOff();
                 } else {
-                    Serial.println("Attempt " + String(connectionAttempts) + " of " + String(Config::WiFi::MAX_FAST_RETRIES) + " failed, will retry");
+                    Serial.println("Attempt " + String(connectionAttempts) + " of " + String(Config::WiFi::MAX_FAST_RETRIES) + " failed, will retry silently");
                 }
                 
                 scheduleRetry();
@@ -153,14 +154,18 @@ bool WiFiManager::connectToWiFi() {
     
     Serial.println("Connecting to: " + storedSSID);
     
-    // Stop AP mode and switch to STA mode for connection
-    if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
-        Serial.println("Stopping AP mode for connection attempt");
-        WiFi.softAPdisconnect(true);
+    // If we're in AP mode (captive portal), switch to AP+STA mode to keep portal active during connection
+    if (WiFi.getMode() == WIFI_AP) {
+        Serial.println("Switching to AP+STA mode to maintain captive portal during connection");
+        WiFi.mode(WIFI_AP_STA);
+        delay(100);
+    } else {
+        // If we have stored credentials and no AP, use STA mode only
+        Serial.println("Using STA mode for stored credential connection");
+        WiFi.mode(WIFI_STA);
         delay(100);
     }
     
-    WiFi.mode(WIFI_STA);
     WiFi.begin(storedSSID.c_str(), storedPassword.c_str());
     
     lastConnectionAttempt = millis();
@@ -181,7 +186,8 @@ void WiFiManager::startAccessPoint() {
     // Setup web server routes
     webServer.on("/", [this]() { handleRoot(); });
     webServer.on("/api/scan", [this]() { handleScan(); });
-    webServer.on("/connect", [this]() { handleConnect(); });
+    webServer.on("/connect", HTTP_GET, [this]() { handleConnect(); });
+    webServer.on("/connect", HTTP_POST, [this]() { handleConnect(); });
     webServer.on("/connecting", [this]() { handleConnecting(); });
     webServer.onNotFound([this]() { handleNotFound(); });
     
@@ -191,9 +197,17 @@ void WiFiManager::startAccessPoint() {
 }
 
 void WiFiManager::stopAccessPoint() {
+    Serial.println("Stopping Access Point and web server...");
     dnsServer.stop();
     webServer.stop();
     WiFi.softAPdisconnect(true);
+    
+    // Switch to STA mode only when connected
+    if (WiFi.status() == WL_CONNECTED) {
+        WiFi.mode(WIFI_STA);
+        Serial.println("Switched to STA mode - AP fully disabled");
+    }
+    
     Serial.println("Access Point stopped");
 }
 
@@ -215,6 +229,15 @@ void WiFiManager::saveCredentials(const String& ssid, const String& password) {
     Serial.println("Saved WiFi credentials for: " + ssid);
 }
 
+void WiFiManager::clearCredentials() {
+    preferences.remove("wifi_ssid");
+    preferences.remove("wifi_pass");
+    storedSSID = "";
+    storedPassword = "";
+    hasStoredCredentials = false;
+    Serial.println("Cleared stored WiFi credentials");
+}
+
 String WiFiManager::generateDeviceName() {
     randomSeed(ESP.getEfuseMac());
     uint32_t deviceId = random(100000, 999999);
@@ -222,29 +245,59 @@ String WiFiManager::generateDeviceName() {
 }
 
 void WiFiManager::updateFeedback() {
-    switch (currentState) {
-        case WiFiState::CONNECTING:
-            // Flash blue while connecting
-            systemLED->setBlink(Config::LED_BLINK_FAST, Config::Colors::CASTLE_BLUE);
-            break;
-            
-        case WiFiState::AP_MODE:
-            // Slow purple blink in AP mode
-            systemLED->setBlink(Config::LED_BLINK_SLOW, Config::Colors::ROYAL_PURPLE);
-            break;
-            
-        case WiFiState::CONNECTED:
-            // Steady torch orange when connected
-            systemLED->setOn(Config::Colors::TORCH_ORANGE);
-            break;
-            
-        case WiFiState::CONNECTION_FAILED:
-            // Brief red indication, then off
-            systemLED->setOff();
-            break;
-            
-        default:
-            break;
+    static WiFiState lastFeedbackState = WiFiState::CHECKING_CREDENTIALS;
+    
+    // Only update LED when state changes to avoid constant calls
+    if (currentState != lastFeedbackState) {
+        switch (currentState) {
+            case WiFiState::CONNECTING:
+                // Flashing blue while connecting (per PRD)
+                systemLED->setBlink(Config::LED_BLINK_FAST, Config::Colors::CASTLE_BLUE);
+                Serial.println("LED: Fast blue blink (connecting)");
+                break;
+                
+            case WiFiState::AP_MODE:
+                // Pulsing blue in AP mode (per PRD)
+                systemLED->setBlink(Config::LED_BLINK_SLOW, Config::Colors::CASTLE_BLUE);
+                Serial.println("LED: Slow blue pulse (AP mode)");
+                break;
+                
+            case WiFiState::CONNECTED:
+                // Flash green twice when connected (per PRD) - but only once when state changes
+                if (lastFeedbackState != WiFiState::CONNECTED) {
+                    systemLED->setColor(Config::Colors::SUCCESS_GREEN);
+                    delay(200);
+                    systemLED->setOff();
+                    delay(100);
+                    systemLED->setColor(Config::Colors::SUCCESS_GREEN);
+                    delay(200);
+                    systemLED->setOff();
+                    Serial.println("LED: Green flash twice (connected)");
+                }
+                break;
+                
+            case WiFiState::CONNECTION_FAILED:
+                // Only flash red if we've exhausted all retries (per PRD)
+                if (connectionAttempts >= Config::WiFi::MAX_FAST_RETRIES) {
+                    systemLED->setColor(Config::Colors::DANGER_RED);
+                    delay(200);
+                    systemLED->setOff();
+                    delay(100);
+                    systemLED->setColor(Config::Colors::DANGER_RED);
+                    delay(200);
+                    systemLED->setOff();
+                    Serial.println("LED: Red flash twice (all retries exhausted)");
+                } else {
+                    systemLED->setOff();
+                    Serial.println("LED: Off (failed, will retry)");
+                }
+                break;
+                
+            default:
+                systemLED->setOff();
+                break;
+        }
+        lastFeedbackState = currentState;
     }
 }
 
@@ -321,6 +374,11 @@ void WiFiManager::handleScan() {
 }
 
 void WiFiManager::handleConnect() {
+    Serial.println("handleConnect() called");
+    Serial.println("Method: " + webServer.method());
+    Serial.println("URI: " + webServer.uri());
+    Serial.println("Args: " + String(webServer.args()));
+    
     if (webServer.hasArg("ssid") && webServer.hasArg("password")) {
         String ssid = webServer.arg("ssid");
         String password = webServer.arg("password");
@@ -346,6 +404,9 @@ void WiFiManager::handleConnect() {
         }
     } else {
         Serial.println("Missing SSID or password in request");
+        for (int i = 0; i < webServer.args(); i++) {
+            Serial.println("Arg " + String(i) + ": " + webServer.argName(i) + " = " + webServer.arg(i));
+        }
         webServer.send(400, "text/plain", "Missing SSID or password");
     }
 }
@@ -359,6 +420,11 @@ void WiFiManager::handleConnecting() {
 }
 
 void WiFiManager::handleNotFound() {
+    Serial.println("handleNotFound() called");
+    Serial.println("Method: " + String(webServer.method()));
+    Serial.println("URI: " + webServer.uri());
+    Serial.println("Args: " + String(webServer.args()));
+    
     // Redirect to main page for captive portal
     webServer.sendHeader("Location", "/", true);
     webServer.send(302, "text/plain", "");

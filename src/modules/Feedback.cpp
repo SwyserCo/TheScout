@@ -187,6 +187,15 @@ void BuzzerController::playConnectSuccess() {
     playMelody(successMelody, 7);
 }
 
+void BuzzerController::playSuccessChime() {
+    // Simple 2-tone success chime (per PRD)
+    static const Note successChime[] = {
+        {Config::NOTE_C5, Config::NOTE_EIGHTH},     // First chime
+        {Config::NOTE_D5, Config::NOTE_QUARTER}     // Second chime (higher)
+    };
+    playMelody(successChime, 2);
+}
+
 void BuzzerController::playConnectFailed() {
     // Medieval "alarm bell" pattern - urgent repetitive warning
     static const Note failMelody[] = {
