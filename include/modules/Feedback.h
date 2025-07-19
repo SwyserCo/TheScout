@@ -26,7 +26,13 @@ public:
     void disable();
 };
 
-// Buzzer Controller Class - Non-blocking buzzer control  
+// Note structure for melodies
+struct Note {
+    uint16_t frequency;
+    uint16_t duration;
+};
+
+// Buzzer Controller Class - Non-blocking buzzer control with melody support
 class BuzzerController {
 private:
     uint8_t pin;
@@ -35,11 +41,22 @@ private:
     bool active;
     bool enabled;
     
+    // Melody support
+    const Note* currentMelody;
+    uint8_t melodyLength;
+    uint8_t currentNote;
+    bool playingMelody;
+    unsigned long noteStartTime;
+    
 public:
     BuzzerController(uint8_t buzzerPin);
     void begin();
     void update();           // Non-blocking update - call in loop()
     void beep(unsigned long beepDuration, uint16_t frequency = 1000);
+    void playMelody(const Note* melody, uint8_t length);
+    void playConnectSuccess();   // Plays WiFi connect success chime
+    void playConnectFailed();    // Plays WiFi connect failed chime
+    void playStartup();          // Plays device startup chime
     void stop();
     void enable();
     void disable();

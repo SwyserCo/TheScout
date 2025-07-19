@@ -30,4 +30,20 @@ namespace Config {
     // Buzzer Frequencies
     constexpr uint16_t BUZZER_FREQ_LOW = 800;   // Low tone frequency (Hz)
     constexpr uint16_t BUZZER_FREQ_HIGH = 1200; // High tone frequency (Hz)
+    
+    // Musical Notes (Hz) - 4th octave
+    constexpr uint16_t NOTE_C4 = 262;
+    constexpr uint16_t NOTE_D4 = 294;
+    constexpr uint16_t NOTE_E4 = 330;
+    constexpr uint16_t NOTE_F4 = 349;
+    constexpr uint16_t NOTE_G4 = 392;
+    constexpr uint16_t NOTE_A4 = 440;
+    constexpr uint16_t NOTE_B4 = 494;
+    constexpr uint16_t NOTE_C5 = 523;
+    constexpr uint16_t NOTE_REST = 0;  // Silence
+    
+    // Note durations (ms)
+    constexpr uint16_t NOTE_QUARTER = 200;
+    constexpr uint16_t NOTE_EIGHTH = 100;
+    constexpr uint16_t NOTE_HALF = 400;
 }

@@ -36,6 +36,9 @@ void setup() {
     
     Serial.println("Feedback modules initialized with WS2812B RGB LEDs");
     Serial.println("Demo sequence starting...");
+    
+    // Play startup chime to indicate device is ready
+    buzzer.playStartup();
 }
 
 void loop() {
@@ -50,28 +53,30 @@ void loop() {
         
         switch (demoStep) {
             case 0:
-                Serial.println("Step 1: Activity LED fast blink (blue) + short beep (high tone)");
+                Serial.println("Step 1: Activity LED fast blink (blue) + Startup Chime");
                 activityLED.setBlink(Config::LED_BLINK_FAST, CRGB::Blue);
-                buzzer.beep(Config::BUZZER_BEEP_SHORT, Config::BUZZER_FREQ_HIGH);
+                buzzer.playStartup();
                 break;
                 
             case 1:
-                Serial.println("Step 2: Both LEDs on (red + green) + long beep (low tone)");
+                Serial.println("Step 2: Both LEDs on (red + green) + WiFi Success Chime");
                 systemLED.setOn(CRGB::Red);
                 activityLED.setOn(CRGB::Green);
-                buzzer.beep(Config::BUZZER_BEEP_LONG, Config::BUZZER_FREQ_LOW);
+                buzzer.playConnectSuccess();
                 break;
                 
             case 2:
-                Serial.println("Step 3: System LED fast blink (yellow), Activity LED off");
+                Serial.println("Step 3: System LED fast blink (yellow) + WiFi Failed Chime");
                 systemLED.setBlink(Config::LED_BLINK_FAST, CRGB::Yellow);
                 activityLED.setOff();
+                buzzer.playConnectFailed();
                 break;
                 
             case 3:
-                Serial.println("Step 4: Reset to initial state (white slow blink)");
+                Serial.println("Step 4: Reset to initial state (white slow blink) + Short beep");
                 systemLED.setBlink(Config::LED_BLINK_SLOW, CRGB::White);
                 activityLED.setOff();
+                buzzer.beep(Config::BUZZER_BEEP_SHORT, Config::BUZZER_FREQ_HIGH);
                 break;
         }
         
