@@ -1,46 +1,104 @@
 #include "sensors/LIS2DW12Sensor.h"
 #include "Config.h"
+#include <Wire.h>
+
+// LIS2DW12 Register Addresses
+#define LIS2DW12_WHO_AM_I       0x0F
+#define LIS2DW12_CTRL1          0x20
+#define LIS2DW12_CTRL6          0x25
+#define LIS2DW12_OUT_X_L        0x28
+#define LIS2DW12_OUT_X_H        0x29
+#define LIS2DW12_OUT_Y_L        0x2A
+#define LIS2DW12_OUT_Y_H        0x2B
+#define LIS2DW12_OUT_Z_L        0x2C
+#define LIS2DW12_OUT_Z_H        0x2D
+
+// Expected WHO_AM_I value
+#define LIS2DW12_ID             0x44
 
 LIS2DW12Sensor::LIS2DW12Sensor() : _connected(false), _lastReading(0),
-    _accelX(0), _accelY(0), _accelZ(0), _baselineX(0), _baselineY(0), _baselineZ(0),
-    _tamperThreshold(DEFAULT_TAMPER_THRESHOLD), _tamperDetected(false), 
-    _tamperStartTime(0), _baselineSet(false), _deviceAddress(Config::LIS2DW12_I2C_ADDR) {
+    _accelX(0), _accelY(0), _accelZ(0), _motionDetected(false),
+    _baselineX(0), _baselineY(0), _baselineZ(0) {
 }
 
 bool LIS2DW12Sensor::begin() {
-    // Check WHO_AM_I register
-    uint8_t whoAmI = readRegister(WHO_AM_I);
-    if (whoAmI != WHO_AM_I_VALUE) {
-        Serial.printf("LIS2DW12TR WHO_AM_I mismatch: expected 0x%02X, got 0x%02X\n", WHO_AM_I_VALUE, whoAmI);
+    Serial.printf("[LIS2DW12] Starting initialization - trying multiple addresses\n");
+    
+    // Try common LIS2DW12 addresses: 0x19 (default) and 0x18 (alternate)
+    uint8_t addresses[] = {0x19, 0x18};
+    uint8_t foundAddress = 0;
+    
+    for (uint8_t addr : addresses) {
+        Serial.printf("[LIS2DW12] Testing I2C address 0x%02X\n", addr);
+        
+        Wire.beginTransmission(addr);
+        uint8_t error = Wire.endTransmission();
+        
+        if (error == 0) {
+            Serial.printf("[LIS2DW12] Found device at address 0x%02X\n", addr);
+            foundAddress = addr;
+            break;
+        } else {
+            Serial.printf("[LIS2DW12] No device at address 0x%02X (error=%d)\n", addr, error);
+        }
+    }
+    
+    if (foundAddress == 0) {
+        Serial.println("[LIS2DW12] No device found at any address");
+        _connected = false;
         return false;
     }
     
-    // Configure the sensor
-    // CTRL1: 100Hz ODR, ±2g, normal mode, enable X,Y,Z axes
-    if (!writeRegister(CTRL1, CTRL1_ODR_100HZ | CTRL1_FS_2G | CTRL1_MODE_NORMAL | 0x07)) {
-        Serial.println("Failed to configure LIS2DW12TR CTRL1");
+    // Update the address temporarily for testing
+    // Note: This is a hack - we should properly configure this
+    Serial.printf("[LIS2DW12] Using address 0x%02X for WHO_AM_I test\n", foundAddress);
+    
+    // Manual WHO_AM_I read using found address
+    Wire.beginTransmission(foundAddress);
+    Wire.write(LIS2DW12_WHO_AM_I);
+    Wire.endTransmission();
+    
+    Wire.requestFrom((uint8_t)foundAddress, (uint8_t)1);
+    uint8_t whoami = 0xFF;
+    if (Wire.available()) {
+        whoami = Wire.read();
+    }
+    
+    Serial.printf("[LIS2DW12] WHO_AM_I register: 0x%02X (expected 0x44)\n", whoami);
+    
+    if (whoami != LIS2DW12_ID) {
+        Serial.printf("[LIS2DW12] WHO_AM_I failed: 0x%02X (expected 0x%02X)\n", whoami, LIS2DW12_ID);
+        _connected = false;
         return false;
     }
     
-    // CTRL2: Default settings (no high-pass filter)
-    if (!writeRegister(CTRL2, 0x00)) {
-        Serial.println("Failed to configure LIS2DW12TR CTRL2");
-        return false;
+    Serial.println("[LIS2DW12] WHO_AM_I OK - sensor identified");
+    
+    // Simple configuration: 50Hz, ±2g scale, normal mode
+    writeRegister(LIS2DW12_CTRL1, 0x50);  // 50Hz, normal mode
+    writeRegister(LIS2DW12_CTRL6, 0x00);  // ±2g scale
+    
+    delay(100); // Let sensor stabilize
+    
+    // Read initial baseline (average of a few readings)
+    Serial.println("[LIS2DW12] Setting baseline...");
+    float sumX = 0, sumY = 0, sumZ = 0;
+    for (int i = 0; i < 10; i++) {
+        readAcceleration();
+        sumX += _accelX;
+        sumY += _accelY; 
+        sumZ += _accelZ;
+        delay(50);
     }
     
-    // CTRL3: Default settings
-    if (!writeRegister(CTRL3, 0x00)) {
-        Serial.println("Failed to configure LIS2DW12TR CTRL3");
-        return false;
-    }
+    _baselineX = sumX / 10.0f;
+    _baselineY = sumY / 10.0f;
+    _baselineZ = sumZ / 10.0f;
+    
+    Serial.printf("[LIS2DW12] Baseline set: X=%.3f, Y=%.3f, Z=%.3f\n", 
+                  _baselineX, _baselineY, _baselineZ);
     
     _connected = true;
-    Serial.println("LIS2DW12TR accelerometer initialized");
-    
-    // Wait a bit and then establish baseline
-    delay(100);
-    updateBaseline();
-    
     return true;
 }
 
@@ -52,184 +110,79 @@ void LIS2DW12Sensor::readSensor(DynamicJsonDocument& doc) {
     if (!_connected) return;
     
     uint32_t currentTime = millis();
-    if (currentTime - _lastReading >= READING_INTERVAL) {
-        // Read raw acceleration data
-        int16_t rawX = readRegister16(OUT_X_L);
-        int16_t rawY = readRegister16(OUT_Y_L);
-        int16_t rawZ = readRegister16(OUT_Z_L);
-        
-        // Convert to g values
-        _accelX = rawX * SCALE_FACTOR;
-        _accelY = rawY * SCALE_FACTOR;
-        _accelZ = rawZ * SCALE_FACTOR;
-        
-        // Check for motion
-        checkTamper();
-        
+    if (currentTime - _lastReading >= 100) { // Read every 100ms
+        readAcceleration();
+        checkMotion();
         _lastReading = currentTime;
     }
     
     doc["accel_x"] = _accelX;
     doc["accel_y"] = _accelY;
     doc["accel_z"] = _accelZ;
-    doc["tamper"] = _tamperDetected;
-    doc["motion_detected"] = _tamperDetected;
+    doc["motion"] = _motionDetected;
+}
+
+void LIS2DW12Sensor::readAcceleration() {
+    if (!_connected) return;
     
-    // Add baseline and deviation info for debugging
-    if (_baselineSet) {
-        float deviation = sqrt(pow(_accelX - _baselineX, 2) + pow(_accelY - _baselineY, 2) + pow(_accelZ - _baselineZ, 2));
+    // Read raw acceleration data (6 bytes starting from OUT_X_L)
+    Wire.beginTransmission(Config::LIS2DW12_I2C_ADDR);
+    Wire.write(LIS2DW12_OUT_X_L | 0x80); // Auto-increment
+    Wire.endTransmission();
+    
+    Wire.requestFrom((uint8_t)Config::LIS2DW12_I2C_ADDR, (uint8_t)6);
+    
+    if (Wire.available() >= 6) {
+        int16_t rawX = Wire.read() | (Wire.read() << 8);
+        int16_t rawY = Wire.read() | (Wire.read() << 8);
+        int16_t rawZ = Wire.read() | (Wire.read() << 8);
         
-        #ifdef DEBUG
-        Serial.printf("[LIS2DW12] Current acceleration: X=%.3f, Y=%.3f, Z=%.3f (g)\n", _accelX, _accelY, _accelZ);
-        Serial.printf("[LIS2DW12] Baseline: X=%.3f, Y=%.3f, Z=%.3f (g)\n", _baselineX, _baselineY, _baselineZ);
-        Serial.printf("[LIS2DW12] Deviation: %.3f (threshold: %.3f)\n", deviation, _tamperThreshold);
-        Serial.printf("[LIS2DW12] Motion detection result: %s\n", _tamperDetected ? "YES" : "NO");
-        #endif
+        // Convert to g (±2g scale, 16-bit resolution)
+        _accelX = rawX * 2.0f / 32768.0f;
+        _accelY = rawY * 2.0f / 32768.0f;
+        _accelZ = rawZ * 2.0f / 32768.0f;
     }
 }
 
-bool LIS2DW12Sensor::checkTamper() {
-    if (!_connected || !_baselineSet) return false;
+bool LIS2DW12Sensor::checkMotion() {
+    if (!_connected) return false;
     
-    // Calculate deviation from baseline
+    // Simple motion detection: compare current reading to baseline
     float deltaX = abs(_accelX - _baselineX);
     float deltaY = abs(_accelY - _baselineY);
     float deltaZ = abs(_accelZ - _baselineZ);
     
-    float deviation = calculateMagnitude(deltaX, deltaY, deltaZ);
+    float totalChange = deltaX + deltaY + deltaZ;
     
-    uint32_t currentTime = millis();
+    // Simple threshold - if total change > 0.1g, consider it motion
+    _motionDetected = (totalChange > 0.1f);
     
-    if (deviation > _tamperThreshold) {
-        if (!_tamperDetected) {
-            _tamperStartTime = currentTime;
-            Serial.printf("[LIS2DW12] Motion started: deviation=%.3fg (threshold=%.3fg)\n", deviation, _tamperThreshold);
-        }
-        
-        // Check if tamper condition persists for required duration
-        uint32_t durationElapsed = currentTime - _tamperStartTime;
-        if (durationElapsed >= TAMPER_DURATION) {
-            _tamperDetected = true;
-            Serial.printf("[LIS2DW12] Motion confirmed after %dms\n", durationElapsed);
-            return true;
-        } else {
-            Serial.printf("[LIS2DW12] Motion pending: %dms/%dms\n", durationElapsed, TAMPER_DURATION);
-        }
-    } else {
-        // Reset tamper detection if below threshold for some time
-        if (_tamperDetected && currentTime - _tamperStartTime >= (TAMPER_DURATION * 5)) {
-            _tamperDetected = false;
-            _tamperStartTime = 0;
-            Serial.println("Motion ended");
-        }
-    }
+    // Serial.printf("[LIS2DW12] X=%.3f Y=%.3f Z=%.3f | Change=%.3f | Motion=%s\n",
+    //               _accelX, _accelY, _accelZ, totalChange, _motionDetected ? "YES" : "NO");
     
-    return _tamperDetected;
+    return _motionDetected;
 }
 
 void LIS2DW12Sensor::update() {
-    if (!_connected) return;
-    
-    uint32_t currentTime = millis();
-    if (currentTime - _lastReading >= READING_INTERVAL) {
-        // Read current acceleration values
-        int16_t rawX = readRegister16(OUT_X_L);
-        int16_t rawY = readRegister16(OUT_Y_L);
-        int16_t rawZ = readRegister16(OUT_Z_L);
-        
-        _accelX = rawX * SCALE_FACTOR;
-        _accelY = rawY * SCALE_FACTOR;
-        _accelZ = rawZ * SCALE_FACTOR;
-        
-        // Check for tamper
-        checkTamper();
-        
-        _lastReading = currentTime;
+    // Simple update - just read acceleration
+    if (_connected) {
+        readAcceleration();
+        checkMotion();
     }
-}
-
-float LIS2DW12Sensor::getAccelX() {
-    return _accelX;
-}
-
-float LIS2DW12Sensor::getAccelY() {
-    return _accelY;
-}
-
-float LIS2DW12Sensor::getAccelZ() {
-    return _accelZ;
-}
-
-void LIS2DW12Sensor::setTamperThreshold(float threshold) {
-    _tamperThreshold = threshold;
-}
-
-void LIS2DW12Sensor::updateBaseline() {
-    if (!_connected) return;
-    
-    // Take several readings and average them
-    float sumX = 0, sumY = 0, sumZ = 0;
-    const int numReadings = 10;
-    
-    for (int i = 0; i < numReadings; i++) {
-        int16_t rawX = readRegister16(OUT_X_L);
-        int16_t rawY = readRegister16(OUT_Y_L);
-        int16_t rawZ = readRegister16(OUT_Z_L);
-        
-        sumX += rawX * SCALE_FACTOR;
-        sumY += rawY * SCALE_FACTOR;
-        sumZ += rawZ * SCALE_FACTOR;
-        
-        delay(10);
-    }
-    
-    _baselineX = sumX / numReadings;
-    _baselineY = sumY / numReadings;
-    _baselineZ = sumZ / numReadings;
-    
-    _baselineSet = true;
-    
-    Serial.printf("LIS2DW12TR baseline set: X=%.3f, Y=%.3f, Z=%.3f\n", 
-                  _baselineX, _baselineY, _baselineZ);
-}
-
-bool LIS2DW12Sensor::writeRegister(uint8_t reg, uint8_t value) {
-    Wire.beginTransmission(_deviceAddress);
-    Wire.write(reg);
-    Wire.write(value);
-    return Wire.endTransmission() == 0;
 }
 
 uint8_t LIS2DW12Sensor::readRegister(uint8_t reg) {
-    Wire.beginTransmission(_deviceAddress);
+    Wire.beginTransmission(Config::LIS2DW12_I2C_ADDR);
     Wire.write(reg);
-    if (Wire.endTransmission() != 0) {
-        return 0;
-    }
+    Wire.endTransmission();
     
-    Wire.requestFrom(_deviceAddress, (uint8_t)1);
-    if (Wire.available()) {
-        return Wire.read();
-    }
-    return 0;
+    Wire.requestFrom((uint8_t)Config::LIS2DW12_I2C_ADDR, (uint8_t)1);
+    return Wire.available() ? Wire.read() : 0;
 }
 
-int16_t LIS2DW12Sensor::readRegister16(uint8_t reg) {
-    Wire.beginTransmission(_deviceAddress);
-    Wire.write(reg | 0x80);  // Set MSB for auto-increment
-    if (Wire.endTransmission() != 0) {
-        return 0;
-    }
-    
-    Wire.requestFrom(_deviceAddress, (uint8_t)2);
-    if (Wire.available() >= 2) {
-        uint8_t lowByte = Wire.read();
-        uint8_t highByte = Wire.read();
-        return (int16_t)((highByte << 8) | lowByte);
-    }
-    return 0;
-}
-
-float LIS2DW12Sensor::calculateMagnitude(float x, float y, float z) {
-    return sqrt(x * x + y * y + z * z);
+void LIS2DW12Sensor::writeRegister(uint8_t reg, uint8_t value) {
+    Wire.beginTransmission(Config::LIS2DW12_I2C_ADDR);
+    Wire.write(reg);
+    Wire.write(value);
+    Wire.endTransmission();
 }

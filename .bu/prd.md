@@ -2,11 +2,12 @@
 
 ## Introduction
 
-The Scout is a compact, sensor-rich device designed for home security and automation. This PRD defines the foundational firmware and MQTT integration required to connect The Scout to Home Assistant, enabling sensor data publishing, relay control, and user feedback via LEDs and buzzer. The goal is to create a plug-and-play experience for users while maintaining reliability and responsiveness.
+The Scout is a compact, sensor-rich device designed for home security and automation. This PRD defines the foundational firmware and MQTT integration required to connect The Scout to Home Assistant, enabling sensor data publishing, alarm logic, relay control, and user feedback via LEDs and buzzer. The goal is to create a plug-and-play experience for users while maintaining reliability and responsiveness.
 
 ## Goals
 
 - Enable seamless integration with Home Assistant via MQTT auto-discovery.
+- Provide real-time sensor data and alarm triggering logic.
 - Support easy Wi-Fi setup using WiFiManager.
 - Offer clear user feedback through LEDs and buzzer.
 - Allow control of a physical relay for automating dumb devices.
@@ -36,14 +37,26 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - All sensors appear in Home Assistant via auto-discovery.
 - Sensor data updates in real time.
 
-### User Story 3: Relay Control
+### User Story 3: Alarm Logic
+**As a homeowner**, I want The Scout to trigger an alarm when tampering, sound, or presence is detected while alarm is armed.
+
+**Acceptance Criteria:**
+- Device subscribes to MQTT topic for arming/disarming.
+- Alarm triggers only when armed.
+- Alarm state is published to MQTT.
+- Activity LED flashes when alarm is triggered.
+- Buzzer plays a siren chime when alarm is triggered.
+- Buzzer stops when alarm is silenced, but LED keeps flashing.
+- LED and Buzzer stops when alarm is disarmed.
+
+### User Story 4: Relay Control
 **As a smart home enthusiast**, I want to control the relay from Home Assistant to automate dumb devices.
 
 **Acceptance Criteria:**
 - Relay appears as a switch entity in Home Assistant.
 - Relay toggles within 500ms of MQTT command.
 
-### User Story 4: Factory Reset
+### User Story 5: Factory Reset
 **As a user**, I want to reset the device to factory settings using a physical button.
 
 **Acceptance Criteria:**
@@ -54,16 +67,23 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 ## Functional Requirements
 - WiFiManager setup with captive portal and Preferences storage.
 - Unique device name generation starting with `TheScout-` and stored useing PreferencesAPI.
-- MQTT connection and auto-discovery for all sensors following: https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery
+- MQTT connection and auto-discovery for all sensors.
 - Sensor publishing:
   - LD2420: presence detection
-  - Accelerometer: tamper detection (basic movement yes or no)
+  - Accelerometer: tamper detection
+  - SPL microphone: sound detection
   - BME280: temperature, humidity, pressure
   - VEML7700: ambient light
+- Alarm logic:
+  - Trigger only when armed
+  - Accelerometer: movement > 3s
+  - SPL mic: loud or sustained noise > 5s
+  - LD2420: presence > 5s
 - Relay control via MQTT.
 - LED and buzzer feedback:
-  - System LED: flash when connecting to Wifi, flash green 2x when connected
-  - Buzzer: chimes for success, failure, timeout of wifi connection. REquires PWM
+  - System LED: red (connecting), green 3x (connected), red (reset)
+  - Activity LED: on (armed), flashing (alarm)
+  - Buzzer: chimes for success, failure, timeout of wifi connection
 - Factory reset when Factory Reset Button is held in for 5 seconds
   - SystemLED flashes until 5 seconds is reached
   - After 5 seconds, Wifi credentials and Unique Device Name are also cleared using PreferencesAPI
@@ -96,7 +116,7 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 ## Technical Considerations
 
 - It's best practice to separate declarations in header files (.h) from implementations in source files (.cpp)
-- Make sure you look at .github folder copilot-instructions.md and copilot-background.md files for more insights
+- Make sure you look at .github folder .md files for more insights
 - ESP32-S3 is single-threaded; avoid blocking operations.
 - Device is USB-powered; battery optimization not required.
 - Use best-in-class libraries for MQTT, WiFiManager, Preferences.
@@ -105,12 +125,11 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - Buzzer needs PWM signal to be driven.
 - Microphone is an analog MEMS microphone, it requires no clock and connects directly to an analog-to-digital converter (ADC) pin on your ESP32
 
-| Sensor Data               | I2C address |  Libraries  |
-|---------------------------|-------------|-------------|
-| BME280                    | 0x76        | [BME280](https://github.com/malokhvii-eduard/arduino-bme280) |
-| VEML7700                  | 0x10        | [VEML7700](https://github.com/adafruit/Adafruit_VEML7700) |
-| ST LIS2DW12TR             | 0x19        | [LIS2DW12TR](https://github.com/arraym/LIS2DW12-Arduino-Lib) |
-| LD2420                    | RX/TX       | [LD2420](https://github.com/phuongnamzz/HLK-LD2410S) |
+| Sensor Data               | I2C address |
+|---------------------------|-------------|
+| BME280                    | 0x76     |
+| VEML7700                  | 0x10     |
+| ST LIS2DW12TR             | 0x19     |
 
 ## Success Metrics
 
@@ -118,8 +137,11 @@ The Scout is a compact, sensor-rich device designed for home security and automa
 - Setup time < 2 minutes
 - MQTT discovery within 10 seconds
 - Sensor accuracy ±5%
+- Alarm triggers within 1 second
 - Relay toggles within 500ms
+- 0 false alarms during 24h idle test
 - 100% feedback accuracy for LEDs and buzzer
+- Alarm state be latched
 - sensor thresholds be configurable via MQTT
 
 ## Pin Mapping

@@ -48,6 +48,8 @@ void handleThresholdCommand(const String& sensor, float threshold);
 void checkFactoryReset();
 void performFactoryReset();
 void printSystemInfo();
+void printSimpleDebug();
+void runHardwareTests();
 void scanI2CDevices();
 
 void setup() {
@@ -82,7 +84,14 @@ void setup() {
     // Initialize sensors
     Serial.println("Initializing sensors...");
     
+    Serial.printf("I2C Pins: SDA=%d, SCL=%d, Freq=%dHz\n", 
+                  Config::I2C_SDA_PIN, Config::I2C_SCL_PIN, Config::I2C_FREQ);
+    
     Wire.begin(Config::I2C_SDA_PIN, Config::I2C_SCL_PIN);
+    Wire.setClock(Config::I2C_FREQ);
+    
+    Serial.println("I2C bus initialized");
+    delay(500); // Give I2C time to stabilize
     
     // Scan for I2C devices
     Serial.println("Scanning I2C bus...");
@@ -204,10 +213,13 @@ void setup() {
     Serial.println("=== The Scout Ready ===");
     systemLED.setState(LEDState::OFF);
     
-    // Initial sensor readings
-    Serial.println("=== Initial Sensor Readings ===");
+    // Initial status check
+    Serial.println("Performing initial sensor check...");
     delay(1000); // Allow sensors to stabilize
-    publishSensorData();
+    printSimpleDebug();
+    
+    // Run comprehensive hardware tests (disabled - sensors working)
+    // runHardwareTests();
 }
 
 void loop() {
@@ -245,10 +257,10 @@ void loop() {
         lastStatusPublish = currentTime;
     }
     
-    // Debug output (more frequent than sensor publishing)
+    // Debug output (less frequent and simplified)
     #ifdef DEBUG_SERIAL
     if (currentTime - lastDebugOutput >= Config::DEBUG_UPDATE_INTERVAL) {
-        publishSensorData(); // This will show current sensor readings
+        printSimpleDebug();
         lastDebugOutput = currentTime;
     }
     #endif
@@ -260,102 +272,41 @@ void loop() {
 void publishSensorData() {
     DynamicJsonDocument doc(1024);
     
-    Serial.println("=== Sensor Status ===");
-    
-    // Show connection status
-    Serial.printf("Connection Status: BME280=%s, VEML7700=%s, LIS2DW12TR=%s, LD2420=%s\n",
-                  bme280.isConnected() ? "OK" : "FAIL",
-                  veml7700.isConnected() ? "OK" : "FAIL", 
-                  accelerometer.isConnected() ? "OK" : "FAIL",
-                  ld2420.isConnected() ? "OK" : "FAIL");
-    
     // Environmental data
     if (bme280.isConnected()) {
         bme280.readSensor(doc);
-        float temp = doc["temperature"].as<float>();
-        float hum = doc["humidity"].as<float>();
-        float press = doc["pressure"].as<float>();
-        
-        if (isnan(temp) || isnan(hum) || isnan(press)) {
-            Serial.println("BME280: Invalid readings (NaN)");
-        } else {
-            Serial.printf("BME280: T=%.1f°C, H=%.1f%%, P=%.1fhPa\n", temp, hum, press);
-        }
-        
         if (mqtt.isConnected()) {
             mqtt.publishSensorData("environment", doc);
         }
         doc.clear();
-    } else {
-        Serial.println("BME280: DISCONNECTED");
     }
     
     // Light data
     if (veml7700.isConnected()) {
         veml7700.readSensor(doc);
-        float illum = doc["illuminance"].as<float>();
-        float als = doc["als"].as<float>();
-        
-        if (isnan(illum) || isnan(als)) {
-            Serial.println("VEML7700: Invalid readings (NaN)");
-        } else {
-            Serial.printf("VEML7700: Light=%.1flux, ALS=%.1f\n", illum, als);
-        }
-        
         if (mqtt.isConnected()) {
             mqtt.publishSensorData("light", doc);
         }
         doc.clear();
-    } else {
-        Serial.println("VEML7700: DISCONNECTED");
     }
     
     // Motion/tamper data
     if (accelerometer.isConnected()) {
         accelerometer.readSensor(doc);
-        float deviation = doc["deviation"].as<float>();
-        float threshold = doc["threshold"].as<float>();
-        Serial.printf("LIS2DW12TR: X=%.2fg, Y=%.2fg, Z=%.2fg, Motion=%s, Dev=%.3fg/%.3fg\n", 
-                      doc["accel_x"].as<float>(), 
-                      doc["accel_y"].as<float>(), 
-                      doc["accel_z"].as<float>(),
-                      doc["motion_detected"].as<bool>() ? "YES" : "NO",
-                      deviation, threshold);
-        
         if (mqtt.isConnected()) {
             mqtt.publishSensorData("motion", doc);
         }
         doc.clear();
-    } else {
-        Serial.println("LIS2DW12TR: DISCONNECTED");
     }
     
     // Presence data
     if (ld2420.isConnected()) {
         ld2420.readSensor(doc);
-        Serial.printf("LD2420: Presence=%s, Distance=%.1fm, Strength=%d, Moving=%s, Static=%s\n", 
-                      doc["presence"].as<bool>() ? "YES" : "NO",
-                      doc["distance"].as<float>(),
-                      doc["strength"].as<int>(),
-                      doc["moving_target"].as<bool>() ? "YES" : "NO",
-                      doc["static_target"].as<bool>() ? "YES" : "NO");
-        
         if (mqtt.isConnected()) {
             mqtt.publishSensorData("presence", doc);
         }
         doc.clear();
-    } else {
-        Serial.println("LD2420: DISCONNECTED");
     }
-    
-    // System status
-    Serial.printf("System: Alarm=%s, Relay=%s, WiFi=%ddBm, Heap=%d bytes\n", 
-                  alarmSystem.getStateString().c_str(),
-                  relayState ? "ON" : "OFF",
-                  WiFi.RSSI(),
-                  ESP.getFreeHeap());
-    
-    Serial.println("==================");
 }
 
 void publishStatus() {
@@ -366,24 +317,6 @@ void publishStatus() {
     doc["wifi_rssi"] = WiFi.RSSI();
     doc["alarm_state"] = alarmSystem.getStateString();
     doc["relay_state"] = relayState ? "ON" : "OFF";
-    
-    // Serial status output
-    Serial.println("=== Device Status ===");
-    Serial.printf("Device ID: %s\n", wifiManager.getDeviceId().c_str());
-    Serial.printf("Uptime: %d seconds\n", millis() / 1000);
-    Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
-    Serial.printf("WiFi RSSI: %d dBm\n", WiFi.RSSI());
-    Serial.printf("Alarm State: %s\n", alarmSystem.getStateString().c_str());
-    Serial.printf("Relay State: %s\n", relayState ? "ON" : "OFF");
-    Serial.printf("MQTT Connected: %s\n", mqtt.isConnected() ? "YES" : "NO");
-    
-    // Power status
-    bool powerGood = digitalRead(Config::POWER_GOOD_PIN);
-    bool charged = digitalRead(Config::CHARGED_STATUS_PIN);
-    Serial.printf("Power Good: %s\n", powerGood ? "YES" : "NO");
-    Serial.printf("Battery Charged: %s\n", charged ? "YES" : "NO");
-    
-    Serial.println("==================");
     
     if (mqtt.isConnected()) {
         mqtt.publishSensorData("status", doc);
@@ -553,4 +486,108 @@ void scanI2CDevices() {
         Serial.printf("Found %d I2C devices\n", nDevices);
     }
     Serial.println("=========================");
+}
+
+void printSimpleDebug() {
+    Serial.println("=== SCOUT STATUS ===");
+    
+    // Quick sensor status
+    Serial.printf("Sensors: BME280=%s VEML7700=%s LIS2DW12=%s LD2420=%s\n",
+                  bme280.isConnected() ? "OK" : "X",
+                  veml7700.isConnected() ? "OK" : "X", 
+                  accelerometer.isConnected() ? "OK" : "X",
+                  ld2420.isConnected() ? "OK" : "X");
+    
+    // Key sensor readings
+    DynamicJsonDocument doc(512);
+    
+    if (bme280.isConnected()) {
+        bme280.readSensor(doc);
+        Serial.printf("Temperature: %.1f°C\n", doc["temperature"].as<float>());
+        doc.clear();
+    }
+    
+    if (accelerometer.isConnected()) {
+        accelerometer.readSensor(doc);
+        Serial.printf("Motion: %s\n", doc["motion_detected"].as<bool>() ? "YES" : "NO");
+        doc.clear();
+    }
+    
+    if (ld2420.isConnected()) {
+        ld2420.readSensor(doc);
+        Serial.printf("Presence: %s\n", doc["presence"].as<bool>() ? "YES" : "NO");
+        doc.clear();
+    }
+    
+    // System status
+    Serial.printf("Alarm: %s | WiFi: %ddBm | MQTT: %s | Heap: %dk\n", 
+                  alarmSystem.getStateString().c_str(),
+                  WiFi.RSSI(),
+                  mqtt.isConnected() ? "OK" : "X",
+                  ESP.getFreeHeap() / 1024);
+    
+    Serial.println("===================");
+}
+
+void runHardwareTests() {
+    Serial.println("==== HARDWARE DIAGNOSTIC TESTS ====");
+    
+    // Test GPIO functionality
+    Serial.printf("Testing GPIO pins...\n");
+    
+    // Test I2C pins
+    pinMode(Config::I2C_SDA_PIN, INPUT_PULLUP);
+    pinMode(Config::I2C_SCL_PIN, INPUT_PULLUP);
+    delay(100);
+    
+    bool sda_high = digitalRead(Config::I2C_SDA_PIN);
+    bool scl_high = digitalRead(Config::I2C_SCL_PIN);
+    
+    Serial.printf("I2C Pin States: SDA(GPIO%d)=%s, SCL(GPIO%d)=%s\n", 
+                  Config::I2C_SDA_PIN, sda_high ? "HIGH" : "LOW",
+                  Config::I2C_SCL_PIN, scl_high ? "HIGH" : "LOW");
+    
+    if (!sda_high || !scl_high) {
+        Serial.println("WARNING: I2C pins not pulled high - check pull-up resistors or connections");
+    }
+    
+    // Test UART pins
+    pinMode(Config::LD2420_RX_PIN, INPUT);
+    pinMode(Config::LD2420_TX_PIN, OUTPUT);
+    delay(100);
+    
+    Serial.printf("UART Pin Setup: RX(GPIO%d), TX(GPIO%d)\n", 
+                  Config::LD2420_RX_PIN, Config::LD2420_TX_PIN);
+    
+    // Test voltage levels (if possible)
+    Serial.printf("Power Pins: POWER_GOOD(GPIO%d)=%s, CHARGED(GPIO%d)=%s\n",
+                  Config::POWER_GOOD_PIN, digitalRead(Config::POWER_GOOD_PIN) ? "HIGH" : "LOW",
+                  Config::CHARGED_STATUS_PIN, digitalRead(Config::CHARGED_STATUS_PIN) ? "HIGH" : "LOW");
+    
+    // Extended I2C scan with detailed error reporting
+    Serial.println("Extended I2C scan with error analysis...");
+    
+    for (uint8_t addr = 0x08; addr < 0x78; addr++) {
+        Wire.beginTransmission(addr);
+        uint8_t error = Wire.endTransmission();
+        
+        if (error == 0) {
+            Serial.printf("I2C device found at 0x%02X", addr);
+            switch (addr) {
+                case 0x76: case 0x77: Serial.print(" (BME280)"); break;
+                case 0x10: Serial.print(" (VEML7700)"); break;
+                case 0x18: case 0x19: Serial.print(" (LIS2DW12?)"); break;
+                default: Serial.print(" (Unknown)"); break;
+            }
+            Serial.println();
+        } else if (error == 2) {
+            // Address was NACKed - no device
+            // Don't print anything for cleaner output
+        } else {
+            Serial.printf("I2C error %d at address 0x%02X\n", error, addr);
+        }
+        delay(10); // Small delay between attempts
+    }
+    
+    Serial.println("==================================");
 }

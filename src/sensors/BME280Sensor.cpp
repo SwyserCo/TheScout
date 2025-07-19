@@ -35,9 +35,24 @@ void BME280Sensor::readSensor(DynamicJsonDocument& doc) {
     
     uint32_t currentTime = millis();
     if (currentTime - _lastReading >= READING_INTERVAL) {
-        _temperature = _bme.readTemperature();
-        _humidity = _bme.readHumidity();
-        _pressure = _bme.readPressure() / 100.0F; // Convert to hPa
+        // Add retry logic for BME280 readings to handle I2C errors
+        for (int retry = 0; retry < 3; retry++) {
+            _temperature = _bme.readTemperature();
+            _humidity = _bme.readHumidity();
+            _pressure = _bme.readPressure() / 100.0F; // Convert to hPa
+            
+            // Validate readings - BME280 should give reasonable values
+            if (!isnan(_temperature) && !isnan(_humidity) && !isnan(_pressure) &&
+                _temperature > -40 && _temperature < 85 &&  // BME280 range
+                _humidity >= 0 && _humidity <= 100 &&       // Humidity range
+                _pressure > 300 && _pressure < 1100) {      // Pressure range
+                break; // Good readings, exit retry loop
+            }
+            
+            if (retry < 2) {
+                delay(50); // Small delay before retry
+            }
+        }
         
         _lastReading = currentTime;
     }

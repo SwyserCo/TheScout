@@ -6,7 +6,7 @@ namespace Config {
     // Debug Configuration
     #define DEBUG_SERIAL 1                           // Enable debug serial output
     constexpr uint32_t SERIAL_BAUD = 115200;        // Serial baud rate
-    constexpr uint32_t DEBUG_UPDATE_INTERVAL = 2000; // Debug output every 2 seconds
+    constexpr uint32_t DEBUG_UPDATE_INTERVAL = 15000; // Debug output every 15 seconds
     
     // Pin Configuration (matching PRD pin mapping)
     constexpr uint8_t FACTORY_RESET_BTN = 2;    // IO02 (Factory Reset button)
@@ -24,7 +24,7 @@ namespace Config {
     constexpr uint8_t ACTIVITY_LED_PIN = 48;    // IO48 (Activity LED)
 
     // I2C Configuration
-    constexpr uint32_t I2C_FREQ = 400000;      // 400kHz
+    constexpr uint32_t I2C_FREQ = 100000;      // 100kHz (slower, more stable)
 
     // Sensor Addresses
     constexpr uint8_t BME280_I2C_ADDR = 0x76;

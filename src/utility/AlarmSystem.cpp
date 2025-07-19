@@ -102,19 +102,21 @@ void AlarmSystem::reset() {
 }
 
 void AlarmSystem::setTamperThreshold(float threshold) {
-    _accel.setTamperThreshold(threshold);
+    // Simplified - no longer supported
+    Serial.printf("[AlarmSystem] Tamper threshold setting not available in simplified mode\n");
 }
 
 void AlarmSystem::setPresenceThreshold(uint16_t threshold) {
-    _presence.setPresenceThreshold(threshold);
+    // Simplified - no longer supported
+    Serial.printf("[AlarmSystem] Presence threshold setting not available in simplified mode\n");
 }
 
 void AlarmSystem::checkSensors() {
     if (_state != AlarmState::ARMED) return;
     
-    // Check accelerometer for tamper
-    if (_accel.checkTamper()) {
-        triggerAlarm("Tamper detected");
+    // Check accelerometer for motion (simplified)
+    if (_accel.checkMotion()) {
+        triggerAlarm("Motion detected");
         return;
     }
     
