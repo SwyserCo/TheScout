@@ -24,18 +24,18 @@ void setup() {
     // Initialize FastLED
     FastLED.addLeds<WS2812B, Config::SYSTEM_LED_PIN, GRB>(systemLEDs, Config::NUM_LEDS_PER_STRIP);
     FastLED.addLeds<WS2812B, Config::ACTIVITY_LED_PIN, GRB>(activityLEDs, Config::NUM_LEDS_PER_STRIP);
-    FastLED.setBrightness(128); // Set to 50% brightness
+    FastLED.setBrightness(Config::LED_BRIGHTNESS); // Use config constant
     
     // Initialize feedback modules
     systemLED.begin();
     activityLED.begin();
     buzzer.begin();
     
-    // Start with system LED slow blink (white)
-    systemLED.setBlink(Config::LED_BLINK_SLOW, CRGB::White);
+    // Start with medieval torch-like system LED
+    systemLED.setBlink(Config::LED_BLINK_SLOW, Config::Colors::TORCH_ORANGE);
     
-    Serial.println("Feedback modules initialized with WS2812B RGB LEDs");
-    Serial.println("Demo sequence starting...");
+    Serial.println("✅ Feedback modules initialized with WS2812B RGB LEDs");
+    Serial.println("🏰 Demo sequence starting...");
     
     // Play startup chime to indicate device is ready
     buzzer.playStartup();
@@ -82,4 +82,7 @@ void loop() {
         
         demoStep = (demoStep + 1) % 4;
     }
+    
+    // Small delay to prevent watchdog issues and reduce CPU usage
+    delay(Config::LOOP_DELAY_MS);
 }

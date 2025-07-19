@@ -3,7 +3,7 @@
 
 // LEDController Implementation for WS2812B
 LEDController::LEDController(uint8_t ledPin, CRGB* ledArray) : 
-    pin(ledPin), 
+    pin(ledPin),
     leds(ledArray),
     lastToggle(0), 
     interval(0), 
@@ -174,35 +174,42 @@ void BuzzerController::playMelody(const Note* melody, uint8_t length) {
 }
 
 void BuzzerController::playConnectSuccess() {
-    // Ascending chime: C4-E4-G4-C5 (success melody)
+    // Medieval victory bells - fast celebratory pattern
     static const Note successMelody[] = {
-        {Config::NOTE_C4, Config::NOTE_EIGHTH},
-        {Config::NOTE_E4, Config::NOTE_EIGHTH},
-        {Config::NOTE_G4, Config::NOTE_EIGHTH},
-        {Config::NOTE_C5, Config::NOTE_QUARTER}
+        {Config::NOTE_D4, Config::NOTE_SIXTEENTH},  // Quick ornament
+        {Config::NOTE_F4, Config::NOTE_SIXTEENTH},  // Building up
+        {Config::NOTE_A4, Config::NOTE_EIGHTH},     // Rising
+        {Config::NOTE_D5, Config::NOTE_QUARTER},    // Victory peak!
+        {Config::NOTE_A4, Config::NOTE_EIGHTH},     // Echo down
+        {Config::NOTE_F4, Config::NOTE_EIGHTH},     // And
+        {Config::NOTE_D4, Config::NOTE_QUARTER}     // Resolve
     };
-    playMelody(successMelody, 4);
+    playMelody(successMelody, 7);
 }
 
 void BuzzerController::playConnectFailed() {
-    // Descending chime: C5-A4-F4-D4 (failure melody)
+    // Medieval "alarm bell" pattern - urgent repetitive warning
     static const Note failMelody[] = {
-        {Config::NOTE_C5, Config::NOTE_EIGHTH},
-        {Config::NOTE_A4, Config::NOTE_EIGHTH},
-        {Config::NOTE_F4, Config::NOTE_EIGHTH},
-        {Config::NOTE_D4, Config::NOTE_QUARTER}
+        {Config::NOTE_A3, Config::NOTE_EIGHTH},     // Ding-
+        {Config::NOTE_REST, Config::NOTE_SIXTEENTH}, // Quick break
+        {Config::NOTE_A3, Config::NOTE_EIGHTH},     // ding-
+        {Config::NOTE_REST, Config::NOTE_SIXTEENTH}, // Quick break  
+        {Config::NOTE_F3, Config::NOTE_QUARTER},    // DONG!
+        {Config::NOTE_REST, Config::NOTE_EIGHTH},   // Brief pause
+        {Config::NOTE_D3, Config::NOTE_HALF}        // Final low warning toll
     };
-    playMelody(failMelody, 4);
+    playMelody(failMelody, 7);
 }
 
 void BuzzerController::playStartup() {
-    // Startup chime: C4-G4-C5-REST-C5 (friendly greeting)
+    // Medieval herald fanfare - quick trumpet-like call
     static const Note startupMelody[] = {
-        {Config::NOTE_C4, Config::NOTE_EIGHTH},
-        {Config::NOTE_G4, Config::NOTE_EIGHTH},
-        {Config::NOTE_C5, Config::NOTE_QUARTER},
-        {Config::NOTE_REST, Config::NOTE_EIGHTH},
-        {Config::NOTE_C5, Config::NOTE_EIGHTH}
+        {Config::NOTE_C4, Config::NOTE_EIGHTH},     // Ta-
+        {Config::NOTE_G4, Config::NOTE_EIGHTH},     // ta-
+        {Config::NOTE_C5, Config::NOTE_QUARTER},    // TAAAA!
+        {Config::NOTE_REST, Config::NOTE_SIXTEENTH},
+        {Config::NOTE_G4, Config::NOTE_EIGHTH},     // Quick echo
+        {Config::NOTE_C5, Config::NOTE_HALF}        // Final sustain
     };
-    playMelody(startupMelody, 5);
+    playMelody(startupMelody, 6);
 }
