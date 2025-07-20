@@ -3,7 +3,7 @@
 // Pin Configuration (from PRD Master Document)
 namespace Config {
     // LED Pins (WS2812B addressable RGB LEDs)
-    constexpr uint8_t SYSTEM_LED_PIN = 3;      // IO03 - System status LED (WS2812B)
+    constexpr uint8_t SYSTEM_LED_PIN = 3;      // IO03 - System status LED (WS2812B) 
     constexpr uint8_t ACTIVITY_LED_PIN = 45;   // IO45 - Activity LED (WS2812B)
     
     // WS2812B LED Configuration
@@ -55,6 +55,11 @@ namespace Config {
     constexpr uint32_t LED_BLINK_SLOW = 1000;  // Slow blink interval (ms)
     constexpr uint32_t BUZZER_BEEP_SHORT = 100; // Short beep duration (ms)
     constexpr uint32_t BUZZER_BEEP_LONG = 500;  // Long beep duration (ms)
+    
+    // Factory Reset Configuration
+    constexpr uint32_t FACTORY_RESET_HOLD_TIME_MS = 5000;   // 5 seconds hold time
+    constexpr uint32_t FACTORY_RESET_BLINK_INTERVAL = 100;  // Rapid blink during hold (ms)
+    constexpr uint8_t FACTORY_RESET_CONFIRM_FLASHES = 3;    // Number of confirmation flashes
     
     // Buzzer Frequencies
     constexpr uint16_t BUZZER_FREQ_LOW = 800;   // Low tone frequency (Hz)

@@ -53,9 +53,9 @@ This section contains all fixed hardware and network configuration details.
 | Function                  | GPIO Pin | Notes                               |
 |---------------------------|----------|-------------------------------------|
 | Factory Reset Button      | IO02     | Input, requires pull-up             |
-| System LED                | IO09     | Output, for system status           |
-| Accelerometer Interrupt   | IO10     | Input, for tamper detection         |
-| LD2420 Interrupt          | IO11     | Input, for presence detection       |
+| System LED                | IO03     | Output, for system status           |
+| Accelerometer Interrupt   | IO09     | Input, for tamper detection         |
+| LD2420 Interrupt          | IO10     | Input, for presence detection       |
 | Relay Control             | IO12     | Output, to control the relay        |
 | Charged Status            | IO14     | Input, from BQ24074 charge manager  |
 | LD2420 RX                 | IO15     | Connects to LD2420 TX pin           |
@@ -67,7 +67,7 @@ This section contains all fixed hardware and network configuration details.
 | Power Good                | IO21     | Input, from BQ24074 charge manager  |
 | Buzzer                    | IO40     | Output, requires PWM for tones      |
 | SPL Microphone            | IO41     | Analog Input (ADC)                  |
-| Activity LED              | IO48     | Output, for sensor activity         |
+| Activity LED              | IO45     | Output, for sensor activity         |
 
 ### I2C Device Addresses
 
@@ -94,23 +94,23 @@ The firmware for The Scout will be developed in five distinct, sequential phases
 
 ### Phase 1: User Feedback Modules (LED & Buzzer)
 * **Goal**: Create non-blocking controllers for visual and audible feedback.
-* **Reference File**: `PRD_Phase1_Feedback.md`
+* **Reference File**: `PRD_Phase1.md`
 
 ### Phase 2: WiFi Setup & Connectivity
 * **Goal**: Implement a robust, user-friendly captive portal for initial WiFi configuration.
-* **Reference File**: `PRD_Phase2_WiFi.md`
+* **Reference File**: `PRD_Phase2.md`
 
 ### Phase 3: Sensor Integration & Data Acquisition
 * **Goal**: Initialize all onboard sensors and reliably read data from them.
-* **Reference File**: `PRD_Phase3_Sensors.md`
+* **Reference File**: `PRD_Phase3.md`
 
 ### Phase 4: MQTT Integration & Home Assistant Discovery
 * **Goal**: Publish sensor data to the MQTT broker and enable auto-discovery in Home Assistant.
-* **Reference File**: `PRD_Phase4_MQTT.md`
+* **Reference File**: `PRD_Phase4.md`
 
 ### Phase 5: Factory Reset
 * **Goal**: Implement a physical button trigger to erase all settings and return the device to its initial state.
-* **Reference File**: `PRD_Phase5_FactoryReset.md`
+* **Reference File**: `PRD_Phase5.md`
 
 ---
 

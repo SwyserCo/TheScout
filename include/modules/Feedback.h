@@ -58,6 +58,7 @@ public:
     void playSuccessChime();     // Plays simple success chime (per PRD)
     void playConnectFailed();    // Plays WiFi connect failed chime
     void playStartup();          // Plays device startup chime
+    void playResetChime();       // Plays factory reset confirmation chime
     void stop();
     void enable();
     void disable();

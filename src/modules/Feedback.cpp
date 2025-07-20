@@ -222,3 +222,16 @@ void BuzzerController::playStartup() {
     };
     playMelody(startupMelody, 6);
 }
+
+void BuzzerController::playResetChime() {
+    // Medieval "ceremony complete" chime - dignified and final
+    static const Note resetMelody[] = {
+        {Config::NOTE_F4, Config::NOTE_QUARTER},    // Ceremonial
+        {Config::NOTE_A4, Config::NOTE_QUARTER},    // rising
+        {Config::NOTE_C5, Config::NOTE_HALF},       // to completion
+        {Config::NOTE_REST, Config::NOTE_EIGHTH},   // Brief pause
+        {Config::NOTE_F4, Config::NOTE_EIGHTH},     // Echo
+        {Config::NOTE_C5, Config::NOTE_HALF}        // Final confirmation
+    };
+    playMelody(resetMelody, 6);
+}
