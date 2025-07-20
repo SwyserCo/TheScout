@@ -42,17 +42,7 @@ void WiFiManager::update() {
         // Handle reboot after successful setup
         if (setupRebootScheduled && millis() - setupConnectedTime > 3000) {
             Serial.println("[WiFiManager] Rebooting after successful setup...");
-            Serial.flush(); // Ensure the message is sent before restart
-            delay(100);     // Small delay to ensure message is sent
             ESP.restart();
-        }
-        
-        // Debug: Show reboot countdown
-        if (setupRebootScheduled) {
-            unsigned long timeLeft = 3000 - (millis() - setupConnectedTime);
-            if (timeLeft > 0) {
-                Serial.printf("[WiFiManager] Reboot in %lu ms\n", timeLeft);
-            }
         }
     }
     
@@ -82,7 +72,8 @@ void WiFiManager::startSetupMode() {
     
     // Update LED for setup mode
     if (systemLED) {
-        systemLED->setColor(CRGB(255, 100, 0)); // Orange for setup mode
+        systemLED->setColor(255, 100, 0); // Orange for setup mode
+        systemLED->setBrightness(128);
         systemLED->update();
     }
 }
@@ -139,43 +130,45 @@ void WiFiManager::onConnectionRequest(String ssid, String password) {
 void WiFiManager::updateConnectionFeedback() {
     if (!systemLED || !buzzer) return;
     
-    // Don't update LED if reboot is scheduled - let the success feedback show
-    if (setupRebootScheduled) {
-        return;
-    }
-    
     ConnectionState state = connection.getConnectionState();
     
     switch (state) {
         case ConnectionState::IDLE:
             if (isSetupMode) {
                 // Orange for setup mode
-                systemLED->setColor(CRGB(255, 100, 0));
+                systemLED->setColor(255, 100, 0);
+                systemLED->setBrightness(128);
             } else {
                 // Red for no connection
-                systemLED->setColor(CRGB(255, 0, 0));
+                systemLED->setColor(255, 0, 0);
+                systemLED->setBrightness(64);
             }
             break;
             
         case ConnectionState::CONNECTING:
             // Blue blinking for connecting
-            systemLED->setBlink(500, CRGB(0, 100, 255));
+            systemLED->setColor(0, 100, 255);
+            systemLED->setBrightness(128);
+            systemLED->setBlinking(500);
             break;
             
         case ConnectionState::CONNECTED:
+            // Green for connected
+            systemLED->setColor(0, 255, 0);
+            systemLED->setBrightness(128);
+            systemLED->setBlinking(0); // Solid
+            
             // Handle setup mode completion
             if (isSetupMode && !setupRebootScheduled) {
                 scheduleReboot();
-                return; // Don't set LED here, let scheduleReboot handle it
-            } else {
-                // Normal operation - solid green when connected
-                systemLED->setColor(CRGB(0, 255, 0));
             }
             break;
             
         case ConnectionState::FAILED:
             // Red blinking for failed
-            systemLED->setBlink(250, CRGB(255, 0, 0));
+            systemLED->setColor(255, 0, 0);
+            systemLED->setBrightness(128);
+            systemLED->setBlinking(250);
             
             // If this was a setup mode connection, clear bad credentials
             if (isSetupMode) {
@@ -187,7 +180,9 @@ void WiFiManager::updateConnectionFeedback() {
             
         case ConnectionState::TIMEOUT:
             // Orange blinking for timeout
-            systemLED->setBlink(1000, CRGB(255, 165, 0));
+            systemLED->setColor(255, 165, 0);
+            systemLED->setBrightness(128);
+            systemLED->setBlinking(1000);
             
             // Handle timeout in setup mode
             if (isSetupMode) {
@@ -197,7 +192,6 @@ void WiFiManager::updateConnectionFeedback() {
             break;
     }
     
-    // Only update LED if we haven't returned early
     systemLED->update();
 }
 
@@ -209,12 +203,14 @@ void WiFiManager::scheduleReboot() {
     
     // Play success chime
     if (buzzer) {
-        buzzer->playSuccessChime();
+        buzzer->playScoutConnectedChime();
     }
     
     // Brief success feedback
     if (systemLED) {
-        systemLED->setColor(CRGB(0, 255, 0));
+        systemLED->setColor(0, 255, 0);
+        systemLED->setBrightness(255);
+        systemLED->setBlinking(0);
         systemLED->update();
     }
 }

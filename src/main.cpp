@@ -15,7 +15,7 @@ LEDController activityLED(Config::ACTIVITY_LED_PIN, activityLEDs);
 BuzzerController buzzer(Config::BUZZER_PIN);
 
 // Create WiFi manager
-WiFiManager wifiManager(&systemLED, &buzzer);
+WiFiManager wifiManager;
 
 // Create factory reset handler
 FactoryResetHandler factoryReset(&systemLED, &buzzer);
@@ -23,7 +23,10 @@ FactoryResetHandler factoryReset(&systemLED, &buzzer);
 void setup() {
     // Initialize serial communication
     Serial.begin(Config::SERIAL_BAUD);
-    Serial.println("TheScout - Phase 2 + 5: WiFi & Factory Reset");
+    delay(1000); // Give serial time to initialize
+    Serial.println("\n=== TheScout System Starting ===");
+    Serial.println("Phase 2 + 5: WiFi & Factory Reset");
+    Serial.println("Boot reason: " + String(esp_reset_reason()));
     
     // Initialize FastLED with error checking
     FastLED.addLeds<WS2812B, Config::SYSTEM_LED_PIN, GRB>(systemLEDs, Config::NUM_LEDS_PER_STRIP);
@@ -41,12 +44,22 @@ void setup() {
     factoryReset.begin();
     
     // Initialize WiFi manager (will handle its own feedback)
-    wifiManager.begin();
+    Serial.println("About to initialize WiFi manager...");
+    wifiManager.begin(&systemLED, &buzzer);
+    Serial.println("WiFi manager initialized");
     
     Serial.println("TheScout Guard System Ready - Phase 2 + 5");
+    Serial.println("Entering main loop...");
 }
 
 void loop() {
+    // Periodic debug output to confirm loop is running
+    static unsigned long lastDebugOutput = 0;
+    if (millis() - lastDebugOutput > 10000) { // Every 10 seconds
+        Serial.println("Main loop running - uptime: " + String(millis() / 1000) + "s");
+        lastDebugOutput = millis();
+    }
+    
     // Update factory reset handler first (highest priority)
     factoryReset.update();
     

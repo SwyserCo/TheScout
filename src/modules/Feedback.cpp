@@ -85,9 +85,16 @@ BuzzerController::BuzzerController(uint8_t buzzerPin) :
     noteStartTime(0) {}
 
 void BuzzerController::begin() {
-    // No need to set pinMode for tone() - it handles PWM setup automatically
-    // Just ensure it's off initially
-    noTone(pin);
+    // Set pin mode first
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, LOW);
+    
+    // Initialize LEDC for tone generation
+    ledcSetup(0, 1000, 8); // Channel 0, 1kHz base frequency, 8-bit resolution
+    ledcAttachPin(pin, 0);  // Attach pin to channel 0
+    ledcWrite(0, 0);        // Start with no output
+    
+    Serial.println("BuzzerController: LEDC initialized for pin " + String(pin));
 }
 
 void BuzzerController::update() {
@@ -112,7 +119,8 @@ void BuzzerController::update() {
             noteStartTime = currentTime;
             if (currentMelody[currentNote].frequency == Config::NOTE_REST) {
                 noTone(pin);
-            } else {
+                ledcWrite(0, 0); // Ensure LEDC channel is off for rest
+            } else if (currentMelody[currentNote].frequency > 0) {
                 tone(pin, currentMelody[currentNote].frequency);
             }
         }
@@ -132,14 +140,17 @@ void BuzzerController::beep(unsigned long beepDuration, uint16_t frequency) {
     startTime = millis();
     active = true;
     
-    // Use tone() for proper PWM buzzer sound
-    tone(pin, frequency);
+    // Use tone() for proper PWM buzzer sound with safety check
+    if (frequency > 0) {
+        tone(pin, frequency);
+    }
 }
 
 void BuzzerController::stop() {
     active = false;
     playingMelody = false;
     noTone(pin);
+    ledcWrite(0, 0); // Ensure LEDC channel is off
 }
 
 void BuzzerController::enable() {
@@ -168,7 +179,8 @@ void BuzzerController::playMelody(const Note* melody, uint8_t length) {
     // Start playing first note
     if (melody[0].frequency == Config::NOTE_REST) {
         noTone(pin);
-    } else {
+        ledcWrite(0, 0); // Ensure LEDC channel is off for rest
+    } else if (melody[0].frequency > 0) {
         tone(pin, melody[0].frequency);
     }
 }
@@ -188,11 +200,21 @@ void BuzzerController::playConnectSuccess() {
 }
 
 void BuzzerController::playSuccessChime() {
+    // Prevent rapid repeated calls
+    static unsigned long lastSuccessChime = 0;
+    if (millis() - lastSuccessChime < 2000) {
+        Serial.println("BuzzerController: Success chime blocked (too soon after last one)");
+        return;
+    }
+    lastSuccessChime = millis();
+    
     // Simple 2-tone success chime (per PRD)
     static const Note successChime[] = {
         {Config::NOTE_C5, Config::NOTE_EIGHTH},     // First chime
         {Config::NOTE_D5, Config::NOTE_QUARTER}     // Second chime (higher)
     };
+    
+    Serial.println("BuzzerController: Playing success chime");
     playMelody(successChime, 2);
 }
 

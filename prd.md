@@ -7,7 +7,7 @@ This document provides the central technical specifications for "The Scout," a m
 ### Branding & Theme
 * **Product Line:** Guardian
 * **Device Name:** The Scout
-* **Theme:** Medieval. This theme should influence naming conventions (e.g., device names like "The Keep", "The Scout", power supplies like "Hearthstone") and user feedback (e.g., using musical "chimes" for the buzzer instead of generic beeps).
+* **Theme:** Medieval. This theme should influence naming conventions (e.g., device names like "The Scout") and user feedback (e.g., using musical "chimes" for the buzzer instead of generic beeps).
 
 ---
 
