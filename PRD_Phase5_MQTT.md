@@ -1,42 +1,45 @@
 # Product Requirements Document: The Scout - Phase 5
 
-## 1. Phase Goal: Implement Factory Reset Functionality
+## 1. Phase Goal: MQTT Integration & Home Assistant Discovery
 
-The primary goal of this phase is to implement a safe and reliable factory reset mechanism using the dedicated physical button. This feature allows a user to erase all stored configuration and return the device to its out-of-the-box state, ready for a fresh setup.
+With all device hardware and logic functioning, the final phase is to publish sensor data to an MQTT broker and enable seamless integration with Home Assistant using its MQTT Discovery protocol.
 
 ## 2. Core Features & Logic
 
-### A. User Story
-**As a user**, if my device can't connect to WiFi (e.g., I've changed my router) or I want to reconfigure it, I need a simple way to erase its settings and start over.
+### User Story
+**As a Home Assistant user**, I want The Scout to automatically appear in my Home Assistant instance with all its sensors and controls, so I can easily monitor my home and create automations.
 
-### B. Trigger Mechanism
-1.  **Button & Pin**: The factory reset is initiated using the "Factory Reset Button" connected to `IO02` (as defined in `Master_PRD.md`).
-2.  **Activation**: The user must **press and hold** the button for **10 consecutive seconds**. A short, accidental press must not trigger the reset.
-3.  **Non-Blocking Check**: The firmware must check the button's state in the main `loop()` without blocking other operations.
+### Acceptance Criteria
+1.  **MQTT Connection**:
+    * The device must connect to the MQTT broker specified in the `Master_PRD.md`.
+    * The `MQTT_CLIENT_ID` must be the unique `DeviceID` generated in Phase 2.
+    * The device must handle MQTT disconnections gracefully and attempt to reconnect automatically.
+2.  **Home Assistant Discovery**:
+    * On first connect to the MQTT broker, the device must publish configuration payloads for each of its entities to the `homeassistant/` topic prefix. This will enable Home Assistant to automatically discover them.
+    * Refer to the official [Home Assistant MQTT Discovery documentation](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery) for the correct payload structure.
+3.  **Entity Publishing**:
+    * **Device Identity**: All entities must be linked to a single device in Home Assistant. The device configuration payload should include identifiers like `name`, `model` ("The Scout"), and `manufacturer` ("Guardian Security").
+    * **Sensor States**: The device must publish sensor data (acquired in Phase 4) to unique state topics.
+        * **BME280**: Publish temperature, humidity, and pressure as separate sensor entities.
+        * **VEML7700**: Publish lux value as a sensor entity.
+        * **LD2420**: Publish presence as a `binary_sensor`. Payload should be `ON` for presence, `OFF` for no presence.
+        * **Accelerometer (Tamper)**: Publish tamper status as a `binary_sensor` with `device_class: tamper`. It should be `ON` when the tamper flag is true, and automatically reset to `OFF` after a few seconds.
+        * **Microphone (Noise)**: Publish noise status as a `binary_sensor` with `device_class: sound`. It should be `ON` when the loud noise flag is true, and automatically reset to `OFF`.
+    * **Relay Control**:
+        * The relay must be exposed as a `switch` entity.
+        * The device must subscribe to the switch's `command_topic`.
+        * It must change the relay's state immediately upon receiving a command (`ON` or `OFF`).
+        * It must publish the relay's actual state to the `state_topic`.
+4.  **Documentation Generation**:
+    * Create a separate Markdown file named `MQTT_API.md`.
+    * This file must document all MQTT topics the device uses. For each entity, it should list the discovery topic, state topic, and command topic (if applicable).
 
-### C. User Feedback During Reset Process
-The `Feedback` module must be used to provide clear, unambiguous feedback to the user during the reset attempt.
-
-1.  **While Button is Held**:
-    * **System LED (IO09)**: Should blink rapidly in an "alert" color, like orange or red.
-    * **Buzzer**: Should remain silent to avoid being annoying.
-2.  **Upon Successful Reset (after 10 seconds)**:
-    * **System LED (IO09)**: Should flash a confirmation pattern, e.g., three quick green blinks.
-    * **Buzzer**: Must play the distinct `playResetChime()` from the `Feedback` module.
-
-### D. Reset Action
-Once the 10-second hold is confirmed, the device must perform the following actions:
-
-1.  **Erase Preferences**: Completely clear the entire `Preferences` namespace, deleting the stored WiFi credentials and the unique `DeviceID`.
-2.  **Reboot**: Immediately trigger a system reboot.
-
-### E. Expected Outcome
-After the device reboots, it will find no stored credentials in `Preferences`. As per the logic defined in Phase 2, it will automatically enter the **Captive Portal / AP Mode**, allowing the user to perform a fresh setup.
+---
 
 ## 3. Technical Requirements & Implementation Strategy
 
 ### Instructions for Copilot:
-1.  **Implement the Logic Flow**: Adhere strictly to the trigger, feedback, and action logic defined above. The 10-second timer must be accurate and non-blocking.
-2.  **Integrate Phase 1 Modules**: You must `#include` and use the `Feedback` module to provide all user feedback as specified.
-3.  **Code Structure**: This logic can be implemented in a new `DeviceManager` module or added to an appropriate existing module. The button-checking logic should reside in the main `loop()`.
-4.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to hold the reset button for 10 seconds and confirm that the device provides the correct feedback, reboots, and enters AP mode.
+1.  **Adhere to SRP**: Create a dedicated `MqttHandler` class in the `utilities/` directory. Its sole responsibility is managing the MQTT connection, subscriptions, and publishing, as per the Single Responsibility Principle.
+2.  **Use Specified Libraries**: You **must** use `PubSubClient` for MQTT and `ArduinoJson` to construct the discovery and state payloads.
+3.  **Code Structure**: The `MqttHandler` will be called by `main.cpp` or other high-level managers. It should not be tightly coupled with the sensor reading logic. For example, the `SensorManager` can provide a struct of data, and the `MqttHandler` is responsible for formatting and sending it.
+4.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to confirm the device appears in Home Assistant and all entities function correctly.

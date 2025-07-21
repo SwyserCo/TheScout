@@ -63,7 +63,7 @@ The final rendered webpage should look exactly like this screenshot.
     * Store this name in `Preferences`.
 
 ### E. User Feedback (Integration with Phase 1 Modules)
-The `Feedback` module must be used to provide clear status indications:
+The `FeedbackManager` must be used to provide clear status indications:
 
 | State                               | System LED (IO09) Pattern         | Buzzer Action                       |
 | ----------------------------------- | --------------------------------- | ----------------------------------- |
@@ -72,14 +72,12 @@ The `Feedback` module must be used to provide clear status indications:
 | Connection Succeeded                | Flash Green twice                 | `playSuccessChime()`                |
 | Connection Failed (with credentials)| Flash Red twice (at end of 5 tries) | `playFailureTone()` (at end of 5 tries) |
 
-## 3. Deferred Functionality
+---
 
-* **Factory Reset**: The logic for the factory reset button (IO02) is **out of scope** for this phase and will be implemented later.
-
-## 4. Technical Requirements & Implementation Strategy
+## 3. Technical Requirements & Implementation Strategy
 
 ### Instructions for Copilot:
-1.  **Implement the Logic Flow**: Adhere strictly to the connection and failure logic defined in Sections 2A, 2B, and 2C.3.
-2.  **Web Server Endpoints**: The web server must handle requests for `/`, `/api/scan`, and the form submission. The `/api/scan` endpoint must return a JSON array of unique SSID strings.
-3.  **Code Structure**: Create a dedicated `Network` module (`Network.h`/`.cpp`) to encapsulate all setup and connection logic. The HTML, CSS, and JavaScript for the portal should be in a separate `.h` file.
+1.  **Adhere to SRP**: The `WifiHandler` class created in this phase must be solely responsible for network connectivity and the captive portal, as per the Single Responsibility Principle.
+2.  **Use Specified Libraries**: You **must** use the `WiFiManager` library (`tzapu/WiFiManager`) to handle the captive portal logic.
+3.  **Code Structure**: Create a `WifiHandler.h` and `WifiHandler.cpp` inside the `network/` directory.
 4.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to confirm all UI elements and logic flows work exactly as described.

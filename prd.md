@@ -13,13 +13,15 @@ This document provides the central technical specifications for "The Scout," a m
 
 ## 2. Software Architecture & Principles
 
-### Core Principle: Modularity & Reusability
-All firmware development **must** be modular. Functionality should be encapsulated within separate, reusable classes. Each class or module should have a single, well-defined responsibility. This principle is paramount for creating maintainable and testable code.
+### Core Principle: Single Responsibility Principle (SRP)
+This is the most important architectural rule for this project. Every class, and by extension every module, **must** have one, and only one, reason to change. This means each class should have a single, well-defined responsibility.
+
+* **Example:** The `LedController` is only responsible for LEDs. The `BuzzerController` is only responsible for the buzzer. The `WifiHandler` is only responsible for network connectivity. Do not combine unrelated logic into a single class.
 
 ### Code Quality & Best Practices
 The code must be clean, well-documented, and adhere to good software engineering practices.
-* **Keep Files Small:** Each file (`.h` and `.cpp`) should be focused on a single class or a small group of related functions. Avoid creating large, monolithic files that handle many different tasks.
-* **Intelligent File Placement:** Before creating any new file, you **must** review the existing folder structure outlined below. Place new files in the most logical existing subdirectory. If a suitable one does not exist, create a new, logically-named subdirectory for the module.
+* **Keep Files Small:** Each file (`.h` and `.cpp`) should be focused on a single class.
+* **Intelligent File Placement:** Before creating any new file, you **must** review the existing folder structure outlined below. Place new files in the most logical existing subdirectory.
 
 ### Library Management
 Third-party libraries are managed by PlatformIO and located in the `lib/` folder. You **must not** modify the source code of these libraries. If a library's functionality needs to be extended or adapted, create a "wrapper" class within our own source directories that uses the library's public API. Do not alter the original library files.
@@ -32,6 +34,7 @@ To ensure consistency and leverage robust, community-tested code, this project w
 | WiFi Setup / Portal    | WiFiManager                     | `tzapu/WiFiManager`               |
 | MQTT Communication     | PubSubClient                    | `knolleary/PubSubClient`          |
 | JSON Handling          | ArduinoJson                     | `bblanchon/ArduinoJson`           |
+| WS2812B LEDs           | Adafruit NeoPixel               | `adafruit/Adafruit NeoPixel`      |
 | BME280 Sensor          | Adafruit BME280 Library         | `adafruit/Adafruit BME280 Library`|
 | VEML7700 Sensor        | Adafruit VEML7700 Library         | `adafruit/Adafruit VEML7700`      |
 | LIS2DW12 Accelerometer | SparkFun LIS2DW12 Arduino Library | `sparkfun/SparkFun LIS2DW12 Arduino Library` |
@@ -49,7 +52,9 @@ All code must adhere to this specific folder structure to ensure consistency and
             * `Settings.h`      // For MQTT credentials, version info, etc.
             * `Pins.h`          // For all hardware pin definitions.
         * **feedback/**
-            * `FeedbackController.h` // Manages LEDs and Buzzer.
+            * `LedController.h`
+            * `BuzzerController.h`
+            * `FeedbackManager.h` // Orchestrates the two controllers above.
         * **network/**
             * `WifiHandler.h`   // Wrapper for WiFiManager library.
         * **setup/**
@@ -63,7 +68,9 @@ All code must adhere to this specific folder structure to ensure consistency and
     * **src/**
         * `main.cpp`
         * **feedback/**
-            * `FeedbackController.cpp`
+            * `LedController.cpp`
+            * `BuzzerController.cpp`
+            * `FeedbackManager.cpp`
         * **network/**
             * `WifiHandler.cpp`
         * **setup/**
@@ -86,7 +93,7 @@ This section contains all fixed hardware and network configuration details.
 | Function                  | GPIO Pin | Notes                               |
 |---------------------------|----------|-------------------------------------|
 | Factory Reset Button      | IO02     | Input, requires pull-up             |
-| System LED                | IO03     | Output, for system status           |
+| WS2812B Data              | IO03     | Output, for System & Activity LEDs  |
 | Accelerometer Interrupt   | IO09     | Input, for tamper detection         |
 | LD2420 Interrupt          | IO10     | Input, for presence detection       |
 | Relay Control             | IO12     | Output, to control the relay        |
@@ -100,7 +107,6 @@ This section contains all fixed hardware and network configuration details.
 | Power Good                | IO21     | Input, from BQ24074 charge manager  |
 | Buzzer                    | IO40     | Output, requires PWM for tones      |
 | SPL Microphone            | IO41     | Analog Input (ADC)                  |
-| Activity LED              | IO45     | Output, for sensor activity         |
 
 ### I2C Device Addresses
 

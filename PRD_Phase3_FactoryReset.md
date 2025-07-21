@@ -1,49 +1,44 @@
 # Product Requirements Document: The Scout - Phase 3
 
-## 1. Phase Goal: Initialize and Read All Onboard Sensors
+## 1. Phase Goal: Implement Factory Reset Functionality
 
-With WiFi connectivity established, the goal of this phase is to bring the device's sensors to life. This involves writing stable, non-blocking code to initialize each sensor and read data from it periodically. The data will be stored in memory for now, in preparation for MQTT transmission in the next phase.
+The primary goal of this phase is to implement a safe and reliable factory reset mechanism using the dedicated physical button. This feature allows a user to erase all stored configuration and return the device to its out-of-the-box state, ready for a fresh setup.
 
----
+## 2. Core Features & Logic
 
-## 2. Core Features: Sensor Management and Data Acquisition
+### A. User Story
+**As a user**, if my device can't connect to WiFi (e.g., I've changed my router) or I want to reconfigure it, I need a simple way to erase its settings and start over.
 
-### User Story
-**As a developer**, I want to create a modular and efficient system to manage all of The Scout's sensors, so that I can reliably read data from them without impacting the device's responsiveness.
+### B. Trigger Mechanism
+1.  **Button & Pin**: The factory reset is initiated using the "Factory Reset Button" connected to `IO02` (as defined in `Master_PRD.md`).
+2.  **Activation**: The user must **press and hold** the button for **10 consecutive seconds**. A short, accidental press must not trigger the reset.
+3.  **Non-Blocking Check**: The firmware must check the button's state in the main `loop()` without blocking other operations.
 
-### Acceptance Criteria
-1.  **Sensor Manager**:
-    * Create a central `Sensors` module (`Sensors.h`/`.cpp`) responsible for initializing and periodically reading data from all sensors.
-    * This class should have a public method, e.g., `update()`, that is called in the main `loop()`. This method will internally manage the polling for each sensor using a non-blocking `millis()` timer.
-2.  **I2C Sensor Integration**:
-    * The I2C bus (SDA: IO17, SCL: IO18) must be initialized.
-    * **BME280 (0x76)**: Read temperature, humidity, and pressure. **Polling Frequency**: No more than once every 10 seconds.
-    * **VEML7700 (0x10)**: Read ambient light (lux). **Polling Frequency**: No more than once every 5 seconds.
-    * **LIS2DW12TR (0x19)**: This sensor is for **tamper detection**, not precise orientation.
-        * Configure the sensor to generate an interrupt on the `INT` pin (IO10) when significant motion (a "jolt" or "tap") is detected.
-        * Create a function that sets a boolean flag (e.g., `tamperDetected = true;`) when this interrupt is triggered.
-3.  **UART Sensor Integration**:
-    * **LD2420 (RX: IO15, TX: IO16)**: Initialize the mmWave sensor.
-        * Read presence detection data (e.g., still, moving, or no presence).
-        * The state should be stored in a simple variable (e.g., an `enum`).
-4.  **Analog Sensor Integration**:
-    * **MEMS Microphone (IO41)**:
-        * The goal is to detect loud noises, not perform complex audio analysis.
-        * Implement a function to read the analog value from the microphone.
-        * If the reading exceeds a predefined threshold for a short duration, set a boolean flag (e.g., `loudNoiseDetected = true;`).
-5.  **GPIO Control**:
-    * **Relay (IO12)**: Implement functions within the `Sensors` module to control the relay. It should have simple `on()`, `off()`, and `toggle()` methods.
-6.  **User Feedback (Using Phase 1 Modules)**:
-    * **Activity LED (IO48)**: Use the `Feedback` module to blink the Activity LED briefly every time the `Sensors` module completes a full cycle of sensor reads.
+### C. User Feedback During Reset Process
+The `FeedbackManager` must be used to provide clear, unambiguous feedback to the user during the reset attempt.
+
+1.  **While Button is Held**:
+    * **System LED (PIXEL_SYSTEM)**: Should blink rapidly with `GUARDIAN_ORANGE`.
+    * **Buzzer**: Should remain silent to avoid being annoying.
+2.  **Upon Successful Reset (after 10 seconds)**:
+    * **System LED (PIXEL_SYSTEM)**: Should flash a confirmation pattern, e.g., three quick blinks with `GUARDIAN_GREEN`.
+    * **Buzzer**: Must play the distinct `playResetChime()` from the `BuzzerController`.
+
+### D. Reset Action
+Once the 10-second hold is confirmed, the device must perform the following actions:
+
+1.  **Erase Preferences**: Completely clear the entire `Preferences` namespace, deleting the stored WiFi credentials, device name, and any feedback settings.
+2.  **Reboot**: Immediately trigger a system reboot.
+
+### E. Expected Outcome
+After the device reboots, it will find no stored credentials in `Preferences`. As per the logic defined in Phase 2, it will automatically enter the **Captive Portal / AP Mode**, allowing the user to perform a fresh setup.
 
 ---
 
 ## 3. Technical Requirements & Implementation Strategy
 
 ### Instructions for Copilot:
-1.  **Find Better Libraries**: For the specified sensors, please search for the most robust and well-maintained Arduino libraries. If you find a better alternative to the ones in the original PRD, suggest it and explain why it's better.
-2.  **Best Practices**:
-    * Follow the modular folder structure defined in `Master_PRD.md`.
-    * All sensor reading logic **must** be non-blocking.
-    * For the accelerometer, research the LIS2DW12's "tap detection" or "activity detection" features to implement the interrupt-driven tamper alert efficiently.
-3.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to print sensor readings to the Serial Monitor to verify they are working correctly. The Activity LED should be blinking.
+1.  **Adhere to SRP**: The logic for handling the factory reset should be encapsulated in a dedicated `DeviceManager` class, as per the Single Responsibility Principle.
+2.  **Integrate Phase 1 Modules**: You must `#include` and use the `FeedbackManager` to provide all user feedback as specified.
+3.  **Code Structure**: Create a `DeviceManager.h` and `DeviceManager.cpp` inside the `setup/` directory. The button-checking logic should reside in its `update()` method, which is called from the main `loop()`.
+4.  **Verification**: After generating the code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to hold the reset button for 10 seconds and confirm that the device provides the correct feedback, reboots, and enters AP mode.
