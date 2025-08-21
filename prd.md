@@ -16,12 +16,11 @@ This document provides the central technical specifications for "The Scout," a m
 ### Core Principle: Single Responsibility Principle (SRP)
 This is the most important architectural rule for this project. Every class, and by extension every module, **must** have one, and only one, reason to change. This means each class should have a single, well-defined responsibility.
 
-* **Example:** The `LedController` is only responsible for LEDs. The `BuzzerController` is only responsible for the buzzer. The `WifiHandler` is only responsible for network connectivity. Do not combine unrelated logic into a single class.
-
 ### Code Quality & Best Practices
 The code must be clean, well-documented, and adhere to good software engineering practices.
 * **Keep Files Small:** Each file (`.h` and `.cpp`) should be focused on a single class.
 * **Intelligent File Placement:** Before creating any new file, you **must** review the existing folder structure outlined below. Place new files in the most logical existing subdirectory.
+* **Verbose Logging:** The firmware **must** provide clear diagnostic messages to the Serial Monitor. Key events, such as state changes in the state machine (e.g., "State changed to: WIFI_SETUP"), successful initialization of modules, or errors, must be logged. This is crucial for debugging. These logs should be wrapped in `#ifdef DEBUG` blocks to allow for a clean release build without serial output.
 
 ### Library Management
 Third-party libraries are managed by PlatformIO and located in the `lib/` folder. You **must not** modify the source code of these libraries. If a library's functionality needs to be extended or adapted, create a "wrapper" class within our own source directories that uses the library's public API. Do not alter the original library files.
@@ -129,26 +128,30 @@ This section contains all fixed hardware and network configuration details.
 
 ## 4. Development Roadmap
 
-The firmware for The Scout will be developed in five distinct, sequential phases. Use the corresponding PRD file for the detailed requirements of each phase.
+The firmware for The Scout will be developed in six distinct, sequential phases.
+
+### Phase 0: Project Scaffolding & Core Architecture
+* **Goal**: Create the complete folder structure, configuration files, and skeleton code for the entire project.
+* **Reference File**: `PRD_Phase0_Scaffolding.md`
 
 ### Phase 1: User Feedback Modules (LED & Buzzer)
-* **Goal**: Create non-blocking controllers for visual and audible feedback.
+* **Goal**: Implement the logic for the `FeedbackManager`, `LedController`, and `BuzzerController`.
 * **Reference File**: `PRD_Phase1_Feedback.md`
 
 ### Phase 2: WiFi Setup & Connectivity
-* **Goal**: Implement a robust, user-friendly captive portal for initial WiFi configuration.
+* **Goal**: Implement the logic for the `WifiHandler` to manage the captive portal.
 * **Reference File**: `PRD_Phase2_WiFi.md`
 
 ### Phase 3: Factory Reset
-* **Goal**: Implement a physical button trigger to erase all settings and return the device to its initial state.
+* **Goal**: Implement the logic for the `DeviceManager` to handle the factory reset button.
 * **Reference File**: `PRD_Phase3_FactoryReset.md`
 
 ### Phase 4: Sensor Integration & Data Acquisition
-* **Goal**: Initialize all onboard sensors and reliably read data from them.
+* **Goal**: Implement the logic for the `SensorManager` and individual sensor wrappers.
 * **Reference File**: `PRD_Phase4_Sensors.md`
 
 ### Phase 5: MQTT Integration & Home Assistant Discovery
-* **Goal**: Publish sensor data to the MQTT broker and enable auto-discovery in Home Assistant.
+* **Goal**: Implement the logic for the `MqttHandler`.
 * **Reference File**: `PRD_Phase5_MQTT.md`
 
 ---
