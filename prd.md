@@ -60,7 +60,7 @@ All code must adhere to this specific folder structure to ensure consistency and
             * `DeviceManager.h` // Handles Factory Reset and other device-level setup.
         * **sensors/**
             * `SensorManager.h` // Main class to orchestrate all sensors.
-            * `BME280_Sensor.h` // Wrapper for the BME280 library.
+            * `LD2410S_Sensor.h` // Wrapper for the BME280 library.
             * `...`             // Other sensor-specific wrappers.
         * **utilities/**
             * `MqttHandler.h`   // Manages all MQTT communication.
@@ -91,29 +91,17 @@ This section contains all fixed hardware and network configuration details.
 
 | Function                  | GPIO Pin | Notes                               |
 |---------------------------|----------|-------------------------------------|
-| Factory Reset Button      | IO02     | Input, requires pull-up             |
-| WS2812B Data              | IO03     | Output, for System & Activity LEDs  |
-| Accelerometer Interrupt   | IO09     | Input, for tamper detection         |
-| LD2420 Interrupt          | IO10     | Input, for presence detection       |
-| Relay Control             | IO12     | Output, to control the relay        |
+| Factory Reset Button      | IO02     | Input, has 10k pull up resistor     |
+| LED System status         | IO03     | Output, for System Status WS2812B   |
+| LED System activity       | IO45     | Output, for System Activity WS2812B |
+| PIR Sensor                | IO13     | Input, from PIR Sensor              |
 | Charged Status            | IO14     | Input, from BQ24074 charge manager  |
 | LD2420 RX                 | IO15     | Connects to LD2420 TX pin           |
 | LD2420 TX                 | IO16     | Connects to LD2420 RX pin           |
-| I2C SDA                   | IO17     | I2C Data Line                       |
-| I2C SCL                   | IO18     | I2C Clock Line                      |
-| USB D+                    | IO19     | For native USB (if used)            |
-| USB D-                    | IO20     | For native USB (if used)            |
+| USB D+                    | IO19     | For native USB and programming      |
+| USB D-                    | IO20     | For native USB and programming      |
 | Power Good                | IO21     | Input, from BQ24074 charge manager  |
-| Buzzer                    | IO40     | Output, requires PWM for tones      |
-| SPL Microphone            | IO41     | Analog Input (ADC)                  |
-
-### I2C Device Addresses
-
-| Sensor                    | I2C Address |
-|---------------------------|-------------|
-| BME280 (Temp/Hum/Press)   | 0x76        |
-| VEML7700 (Ambient Light)  | 0x10        |
-| LIS2DW12TR (Accelerometer)| 0x19        |
+| Buzzer                    | IO41     | Output, requires PWM for tones      |
 
 ### MQTT Broker Configuration
 

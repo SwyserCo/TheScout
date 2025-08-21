@@ -7,7 +7,7 @@ The primary goal of this phase is to establish the complete, compilable skeleton
 ## 2. Core Features & Architecture
 
 ### User Story
-**As a developer**, I need the foundational structure of my project set up correctly from the start, so I can focus on implementing features in their logical place without worrying about project configuration.
+**As a developer**, I need the foundational structure of my project set up correctly from the start, so I can focus on implementing features in their logical place without worrying about project configuration. This should also make it easier for us to scale the code, add new features and removed any if needed.
 
 ### Acceptance Criteria
 

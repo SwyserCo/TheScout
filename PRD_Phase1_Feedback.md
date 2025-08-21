@@ -17,7 +17,7 @@ The primary goal of this phase is to create a clean, modular feedback system com
 #### A. `LedController` Class (`feedback/LedController.h` & `.cpp`)
 This class is solely responsible for the LEDs.
 
-1.  **Hardware & Library**: Manages a chain of **two (2) WS2812B LEDs** and **must** use the `Adafruit NeoPixel` library.
+1.  **Hardware & Library**: Manages **two (2) WS2812B LEDs** and **must** use the `Adafruit NeoPixel` library.
 2.  **Color Palette & Pixels**: The header file must define the standard color palette (`GUARDIAN_GREEN`, etc.) and pixel names (`PIXEL_SYSTEM`, `PIXEL_ACTIVITY`).
 3.  **Non-Blocking Operation**: All pattern methods must be non-blocking, managed by an `update()` method.
 4.  **Required Methods**:
