@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#include <Adafruit_NeoPixel.h>
+#include <FastLED.h>
 
 /**
  * @brief LED animation types for WS2812B control
@@ -15,48 +15,38 @@ enum class LedAnimation {
  * @brief Pixel identifiers for The Scout
  */
 enum PixelIndex {
-    PIXEL_SYSTEM = 0,   // System status LED
-    PIXEL_ACTIVITY = 1  // Activity LED
+    PIXEL_SYSTEM = 0,   // System status LED (index 0 in array)
+    PIXEL_ACTIVITY = 1  // Activity LED (index 1 in array)
 };
 
 /**
  * @brief HearthGuard color palette (medieval themed)
- * Using Adafruit NeoPixel Color() function for proper RGB conversion
+ * Using FastLED CRGB constants as required by PRD
  */
 namespace HearthGuardColors {
-    // These will be converted to proper colors using Color() in implementation
-    struct RGBColor {
-        uint8_t r, g, b;
-    };
-    
-    constexpr RGBColor HEARTHGUARD_GREEN = {0, 255, 0};    // Pure green
-    constexpr RGBColor HEARTHGUARD_RED = {255, 0, 0};      // Pure red  
-    constexpr RGBColor HEARTHGUARD_BLUE = {0, 0, 255};     // Pure blue
-    constexpr RGBColor HEARTHGUARD_ORANGE = {255, 165, 0}; // Orange
-    constexpr RGBColor HEARTHGUARD_YELLOW = {255, 255, 0}; // Yellow
-    constexpr RGBColor BLACK = {0, 0, 0};                  // Off
+    const CRGB HEARTHGUARD_GREEN = CRGB::Green;
+    const CRGB HEARTHGUARD_RED = CRGB::Red;  
+    const CRGB HEARTHGUARD_BLUE = CRGB::Blue;
+    const CRGB HEARTHGUARD_ORANGE = CRGB::OrangeRed;
+    const CRGB HEARTHGUARD_YELLOW = CRGB::Yellow;
+    const CRGB BLACK = CRGB::Black;
 }
 
 /**
  * @brief Advanced LED controller for medieval-themed IoT device
  * 
- * Manages two separate WS2812B LEDs with non-blocking animations.
- * Supports SOLID, BLINK, and PULSE animations with stealth mode.
+ * Uses FastLED library with single CRGB array and two addLeds calls
+ * as specified in PRD Phase 1 requirements.
  */
 class LedController {
 public:
     /**
-     * @brief Constructor - initializes pointers to nullptr
+     * @brief Constructor - no hardware initialization (PRD requirement)
      */
     LedController();
 
     /**
-     * @brief Destructor - cleans up allocated NeoPixel objects
-     */
-    ~LedController();
-
-    /**
-     * @brief Initialize LED controller and hardware
+     * @brief Initialize LED controller with FastLED
      */
     void begin();
 
@@ -80,11 +70,17 @@ public:
     /**
      * @brief Start animation on specified pixel
      * @param pixelIndex PIXEL_SYSTEM or PIXEL_ACTIVITY
-     * @param color RGB color struct
+     * @param color CRGB color
      * @param animation Animation type
      * @param interval Animation interval in ms
      */
-    void startAnimation(uint8_t pixelIndex, HearthGuardColors::RGBColor color, LedAnimation animation, uint16_t interval);
+    void startAnimation(uint8_t pixelIndex, CRGB color, LedAnimation animation, uint16_t interval);
+
+    /**
+     * @brief Turn off specified LED (PRD requirement)
+     * @param pixelIndex Which pixel to turn off
+     */
+    void turnOff(uint8_t pixelIndex);
 
     /**
      * @brief Turn off all LEDs
@@ -92,26 +88,25 @@ public:
     void turnOff();
 
 private:
-    // Hardware configuration
-    static constexpr uint8_t NUM_PIXELS = 2;
+    // Hardware configuration (PRD: single CRGB array, two addLeds calls)
+    static constexpr uint8_t LED_COUNT = 2;
     static constexpr uint8_t FADE_STEP_MS = 50; // Fixed 50ms fade duration
+    
+    // FastLED array for both LEDs (PRD requirement)
+    CRGB leds[LED_COUNT];
 
     // Animation state for each pixel
     struct PixelState {
         LedAnimation animation = LedAnimation::SOLID;
-        HearthGuardColors::RGBColor baseColor = {0, 0, 0};
+        CRGB baseColor = CRGB::Black;
         uint16_t interval = 0;
         unsigned long lastUpdate = 0;
         bool isOn = false;
         uint8_t pulsePhase = 0; // For sine wave pulse effect
     };
-
-    // Hardware objects - two separate NeoPixel instances (pointers to avoid early construction)
-    Adafruit_NeoPixel* systemLed;
-    Adafruit_NeoPixel* activityLed;
     
     // State management
-    PixelState pixelStates[NUM_PIXELS];
+    PixelState pixelStates[LED_COUNT];
     uint8_t globalBrightness = 255;
     bool stealthMode = false;
     bool ledsInitialized = false;
@@ -125,28 +120,20 @@ private:
     /**
      * @brief Apply color to specific pixel with brightness scaling
      * @param pixelIndex Which pixel to update
-     * @param color RGB color to apply
+     * @param color CRGB color to apply
      */
-    void applyPixelColor(uint8_t pixelIndex, HearthGuardColors::RGBColor color);
+    void applyPixelColor(uint8_t pixelIndex, CRGB color);
 
     /**
      * @brief Scale color by brightness factor
-     * @param color Original RGB color
+     * @param color Original CRGB color
      * @param brightness Brightness factor (0-255)
-     * @return Scaled RGB color
+     * @return Scaled CRGB color
      */
-    HearthGuardColors::RGBColor scaleColor(HearthGuardColors::RGBColor color, uint8_t brightness);
+    CRGB scaleColor(CRGB color, uint8_t brightness);
 
     /**
-     * @brief Convert RGB color to NeoPixel 32-bit color
-     * @param color RGB color struct
-     * @param pixelIndex Which pixel (for proper Color() function call)
-     * @return 32-bit color value
-     */
-    uint32_t rgbToColor(HearthGuardColors::RGBColor color, uint8_t pixelIndex);
-
-    /**
-     * @brief Calculate sine wave value for pulse animation
+     * @brief Calculate sine wave value for pulse animation (PRD: smooth breathing)
      * @param phase Phase value (0-255)
      * @return Sine wave value (0-255)
      */

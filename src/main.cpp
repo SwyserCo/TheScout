@@ -30,27 +30,9 @@ SensorManager sensorManager;
 MqttHandler mqttHandler;
 
 void setup() {
-    // === EMERGENCY HARDWARE OVERRIDE ===
-    // Try to prevent white LED with aggressive hardware configuration
-    
-    // Configure pins as outputs with pulldown before anything else
+    // Initialize LED pins as outputs and ensure they're OFF
     pinMode(3, OUTPUT);   
     pinMode(45, OUTPUT);  
-    digitalWrite(3, LOW);
-    digitalWrite(45, LOW);
-    
-    // Try setting pin modes with pulldown
-    gpio_config_t io_conf;
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1ULL << 3) | (1ULL << 45);
-    io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&io_conf);
-    
-    // Force LOW using both methods
-    gpio_set_level(GPIO_NUM_3, 0);
-    gpio_set_level(GPIO_NUM_45, 0);
     digitalWrite(3, LOW);
     digitalWrite(45, LOW);
     
@@ -65,15 +47,12 @@ void setup() {
     
     #ifdef DEBUG
     Serial.println("=====================================");
-    Serial.println("    HearthGuard: The Scout (HYBRID)  ");
+    Serial.println("    HearthGuard: The Scout v1.0     ");
     Serial.println("   Medieval Themed IoT HearthGuard   ");
     Serial.println("=====================================");
     Serial.printf("Device: %s v%s\n", DEVICE_NAME, FIRMWARE_VERSION);
     Serial.printf("Build: %s %s\n", __DATE__, __TIME__);
     Serial.println("=====================================");
-    Serial.println("[BOOT] HYBRID MODE: GPIO control first, then NeoPixel");
-    Serial.println("[BOOT] LEDs will be GPIO-controlled for 5 seconds");
-    Serial.println("[BOOT] This prevents white LED at startup");
     Serial.println();
     #endif
     
@@ -86,54 +65,19 @@ void loop() {
     
     switch (currentState) {
         case SystemState::BOOTING:
-            // DIAGNOSTIC GPIO MODE for first 5 seconds
-            if (currentTime - bootStartTime < 5000) {
-                // Keep forcing LEDs OFF with multiple methods
-                gpio_set_level(GPIO_NUM_3, 0);
-                gpio_set_level(GPIO_NUM_45, 0);
-                digitalWrite(3, LOW);
-                digitalWrite(45, LOW);
-                
-                // Status updates
-                static unsigned long lastBootMsg = 0;
-                if (currentTime - lastBootMsg > 1000) {
-                    #ifdef DEBUG
-                    Serial.printf("[BOOT] GPIO mode active... %d/5 seconds\n", 
-                                 (int)((currentTime - bootStartTime) / 1000) + 1);
-                    Serial.println("[BOOT] Activity LED should be OFF - using gpio_set_level + digitalWrite");
-                    Serial.flush();
-                    #endif
-                    lastBootMsg = currentTime;
-                }
-                return; // Stay in this mode
-            }
-            
-            // After 5 seconds, initialize NeoPixel system
-            if (!managersInitialized) {
+            // Initialize after brief delay to ensure stable boot
+            if (currentTime - bootStartTime > 1000 && !managersInitialized) {
                 #ifdef DEBUG
-                Serial.println("[BOOT] === SWITCHING TO NEOPIXEL MODE ===");
-                Serial.println("[BOOT] GPIO control worked - now initializing NeoPixel");
                 Serial.println("[BOOT] Initializing all subsystems...");
                 Serial.flush();
                 #endif
                 
                 // Initialize all manager classes
                 feedbackManager.begin();
-                
-                // Immediately force GPIO override after NeoPixel init
-                digitalWrite(3, LOW);
-                digitalWrite(45, LOW);
-                delay(100);
-                
                 wifiHandler.begin();  
                 deviceManager.begin();
                 sensorManager.begin();
                 mqttHandler.begin();
-                
-                // Final GPIO override
-                digitalWrite(3, LOW);
-                digitalWrite(45, LOW);
-                delay(100);
                 
                 managersInitialized = true;
                 

@@ -37,7 +37,7 @@ To ensure consistency and leverage robust, community-tested code, this project w
 | (WiFiManager Dep.)  | AsyncTCP            | `https://github.com/me-no-dev/AsyncTCP.git`                  |
 | MQTT Communication  | PubSubClient        | `knolleary/PubSubClient`                                     |
 | JSON Handling       | ArduinoJson         | `bblanchon/ArduinoJson`                                      |
-| WS2812B LEDs        | Adafruit NeoPixel   | `adafruit/Adafruit NeoPixel`                                 |
+| WS2812B LEDs        | FastLED             | `fastled/FastLED`                                 |
 | LD2410S Sensor      | ld2410              | `https://github.com/remsh/ld2410.git`                        |
 
 ### Project Folder Structure

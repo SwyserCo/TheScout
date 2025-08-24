@@ -41,7 +41,7 @@ void FeedbackManager::setBrightness(uint8_t brightness) {
     #endif
 }
 
-void FeedbackManager::startAnimation(uint8_t pixelIndex, HearthGuardColors::RGBColor color, LedAnimation animation, uint16_t interval) {
+void FeedbackManager::startAnimation(uint8_t pixelIndex, CRGB color, LedAnimation animation, uint16_t interval) {
     ledController.startAnimation(pixelIndex, color, animation, interval);
 }
 

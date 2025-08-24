@@ -32,11 +32,11 @@ public:
     /**
      * @brief Start LED animation on specified pixel
      * @param pixelIndex PIXEL_SYSTEM or PIXEL_ACTIVITY
-     * @param color RGB color struct
+     * @param color CRGB color (FastLED format)
      * @param animation Animation type
      * @param interval Animation interval in ms
      */
-    void startAnimation(uint8_t pixelIndex, HearthGuardColors::RGBColor color, LedAnimation animation, uint16_t interval);
+    void startAnimation(uint8_t pixelIndex, CRGB color, LedAnimation animation, uint16_t interval);
 
     /**
      * @brief Turn off all LEDs
