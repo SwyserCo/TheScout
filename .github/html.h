@@ -1,7 +1,7 @@
  String html = "<!DOCTYPE html>";
     html += "<html><head><meta charset=\"UTF-8\">";
     html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
-    html += "<title>Guardian Security System - The Scout Setup</title>";
+    html += "<title>HearthGuard Security System - The Scout Setup</title>";
     html += "<style>";
     html += "body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; background-color: #f5f5f5; }";
     html += ".container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }";
@@ -13,7 +13,7 @@
     html += "button:hover { background-color: #45a049; }";
     html += "</style></head><body>";
     html += "<div class=\"container\">";
-    html += "<h1>Guardian Security System</h1>";
+    html += "<h1>HearthGuard Security System</h1>";
     html += "<h2>The Scout</h2>";
     html += "<div class=\"intro\">";
     html += "Welcome to The Scout setup. This page allows you to configure your device's ";

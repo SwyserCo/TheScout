@@ -18,71 +18,57 @@ unsigned long lastStateChange = 0;
 
 // Global Manager Instances
 FeedbackManager feedbackManager;
-WifiHandler wifiHandler(feedbackManager); // Pass feedback manager reference
+WifiHandler wifiHandler;
 DeviceManager deviceManager;
 SensorManager sensorManager;
 MqttHandler mqttHandler;
 
 void setup() {
-    // Initialize Serial Monitor
-    Serial.begin(SERIAL_BAUD_RATE);
-    delay(1000); // Allow serial to stabilize
+    // Initialize Serial for ESP32-S3 with USB CDC
+    Serial.begin(115200);
     
+    // Wait for USB CDC to be ready (important for ESP32-S3)
+    while (!Serial && millis() < 5000) {
+        delay(10);
+    }
+    
+    delay(1000); // Extra delay for stability
+    
+    #ifdef DEBUG
     Serial.println("=====================================");
     Serial.println("    HearthGuard: The Scout (Basic)   ");
-    Serial.println("    Medieval Themed IoT Guardian     ");
+    Serial.println("   Medieval Themed IoT HearthGuard   ");
     Serial.println("=====================================");
     Serial.printf("Device: %s v%s\n", DEVICE_NAME, FIRMWARE_VERSION);
     Serial.printf("Build: %s %s\n", __DATE__, __TIME__);
     Serial.println("=====================================");
+    Serial.println("[BOOT] Starting Phase 0 - Project Scaffolding");
+    Serial.println("[BOOT] All manager classes will be initialized...");
+    Serial.println();
+    Serial.println("[INIT] Initializing all subsystems...");
+    #endif
     
     // Transition to initialization state
     currentState = SystemState::INITIALIZING;
     lastStateChange = millis();
     
-    Serial.println("[BOOT] Starting Phase 0 - Project Scaffolding");
-    Serial.println("[BOOT] All manager classes will be initialized...");
+    // Initialize all manager classes following PRD template exactly
+    #ifdef DEBUG
+    Serial.println("[INIT] Calling begin() on all manager classes...");
+    #endif
     
-    // Initialize all manager classes
-    bool initSuccess = true;
+    feedbackManager.begin();
+    wifiHandler.begin();  
+    deviceManager.begin();
+    sensorManager.begin();
+    mqttHandler.begin();
     
-    Serial.println("\n[INIT] Initializing all subsystems...");
+    #ifdef DEBUG
+    Serial.println("[INIT] All subsystems initialized successfully!");
+    Serial.println("[BOOT] The Scout is ready for Phase 1 development");
+    #endif
     
-    if (!feedbackManager.begin()) {
-        Serial.println("[ERROR] Failed to initialize Feedback Manager");
-        initSuccess = false;
-    }
-    
-    if (!wifiHandler.begin()) {
-        Serial.println("[ERROR] Failed to initialize WiFi Handler");
-        initSuccess = false;
-    }
-    
-    if (!deviceManager.begin()) {
-        Serial.println("[ERROR] Failed to initialize Device Manager");
-        initSuccess = false;
-    }
-    
-    if (!sensorManager.begin()) {
-        Serial.println("[ERROR] Failed to initialize Sensor Manager");
-        initSuccess = false;
-    }
-    
-    if (!mqttHandler.begin()) {
-        Serial.println("[ERROR] Failed to initialize MQTT Handler");
-        initSuccess = false;
-    }
-    
-    // Check initialization results
-    if (initSuccess) {
-        Serial.println("\n[INIT] All subsystems initialized successfully!");
-        Serial.println("[BOOT] The Scout is ready for Phase 1 development");
-        currentState = SystemState::NORMAL_OPERATION;
-    } else {
-        Serial.println("\n[ERROR] System initialization failed!");
-        currentState = SystemState::ERROR_STATE;
-    }
-    
+    currentState = SystemState::NORMAL_OPERATION;
     lastStateChange = millis();
 }
 
@@ -120,7 +106,9 @@ void loop() {
             // Periodic status update
             static unsigned long lastStatusUpdate = 0;
             if (millis() - lastStatusUpdate > STATUS_UPDATE_INTERVAL) {
+                #ifdef DEBUG
                 Serial.println("[STATUS] The Scout is operating normally - Phase 0 Complete");
+                #endif
                 lastStatusUpdate = millis();
             }
             break;
@@ -137,7 +125,9 @@ void loop() {
             
             static unsigned long lastErrorReport = 0;
             if (millis() - lastErrorReport > 10000) { // Report every 10 seconds
+                #ifdef DEBUG
                 Serial.println("[ERROR] System in error state - check initialization");
+                #endif
                 lastErrorReport = millis();
             }
             break;

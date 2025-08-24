@@ -12,7 +12,7 @@ This foundational phase has no dependencies on other code modules. Its purpose i
 ## 3. Core Features & Architecture
 
 ### User Story
-**As a developer**, I need a complete and correct project skeleton generated automatically, with all files containing the necessary boilerplate code, so I can immediately start implementing features without any manual setup or configuration.
+**As a developer**, I need a complete and correct project skeleton generated automatically, with all files containing the necessary boilerplate code and correct hardware configuration, so I can immediately start implementing features without any manual setup or debugging of the initial environment.
 
 ### Acceptance Criteria
 
@@ -20,6 +20,12 @@ This foundational phase has no dependencies on other code modules. Its purpose i
 * [ ] Create the `platformio.ini` file.
 * [ ] It must define the correct `[env:esp32s3]` with the `platform`, `board`, and `framework`.
 * [ ] It must set the `monitor_speed` to `115200`.
+* [ ] **USB CDC Flags (Critical for Serial Output):** To enable the native USB serial monitor on the ESP32-S3, the following `build_flags` **must** be added to the environment configuration:
+    ```ini
+    build_flags = 
+        -DARDUINO_USB_CDC_ON_BOOT=1
+        -DARDUINO_USB_MODE=1
+    ```
 * [ ] It must contain a `lib_deps` section that lists **all** of the "Core Libraries & Dependencies" specified in the `Master_PRD.md`.
 
 #### B. Directory and File Structure
@@ -27,7 +33,7 @@ This foundational phase has no dependencies on other code modules. Its purpose i
 * [ ] Create all the `.h` and `.cpp` files for every class mentioned in the folder structure.
 
 #### C. Boilerplate Code Generation (Mandatory Template)
-All generated files **must not be empty**. They must be populated with the following specific boilerplate code.
+All generated files **must not be empty**. They must be populated with the following specific boilerplate code. This is not a suggestion; it is a strict requirement.
 
 * [ ] **Header Files (`.h`):** Every class header file created (e.g., `FeedbackManager.h`) **must** follow this exact template:
     ```cpp
@@ -76,6 +82,11 @@ All generated files **must not be empty**. They must be populated with the follo
 * [ ] **State Machine**: It must define the `enum class SystemState` and initialize a `currentState` variable to `SystemState::BOOTING`.
 * [ ] **`setup()` function**:
     * Must initialize the Serial monitor using `Serial.begin(115200)`.
+    * **Serial Monitor Wait (Critical):** Immediately after `Serial.begin()`, it **must** include a short delay and a `while` loop to wait for the serial connection to be established. This is essential for seeing boot messages on the ESP32-S3.
+      ```cpp
+      delay(1000); // Wait 1 second
+      while (!Serial); // Wait for serial connection
+      ```
     * Must call the `begin()` method on each of the instantiated manager objects.
 * [ ] **`loop()` function**:
     * Must contain a `switch` statement for the `SystemState`.
@@ -96,8 +107,8 @@ All generated files **must not be empty**. They must be populated with the follo
 
 After completing the implementation for this phase, you **must** end your response with the following checklist, confirming that each item has been completed.
 
-- [ ] **`platformio.ini`:** File created and contains the correct environment and all 7 `lib_deps` entries from the `Master_PRD.md`.
+- [ ] **`platformio.ini`:** File created and contains the correct environment, all 7 `lib_deps` entries, and the critical `build_flags` for USB CDC.
 - [ ] **Folder Structure:** All required subdirectories (`config`, `feedback`, `network`, `setup`, `sensors`, `utilities`) have been created inside `include/` and `src/`.
 - [ ] **Config Files:** `Pins.h`, `Settings.h`, and `DataTypes.h` have been created and populated.
 - [ ] **Module Files:** All 10 module files (`FeedbackManager.h/.cpp`, `LedController.h/.cpp`, etc.) have been created and contain the required, non-empty boilerplate code as per the templates.
-- [ ] **`main.cpp`:** File created and contains the full skeleton code, including includes, global object instantiations, the state machine enum, and populated `setup()` and `loop()` functions.
+- [ ] **`main.cpp`:** File created and contains the full skeleton code, including the critical `while (!Serial);` loop in `setup()`.
