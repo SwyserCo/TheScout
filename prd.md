@@ -13,6 +13,8 @@ This document provides the central technical specifications for "The Scout," a m
 
 ## 2. Software Architecture & Principles
 
+The high-level software architecture, including the system block diagram and data/control flow, is defined in the **`ARCHITECTURE.md`** document. This file provides the conceptual map of how all modules interact and must be referenced for all implementation decisions.
+
 ### Core Principle: Single Responsibility Principle (SRP)
 This is the most important architectural rule for this project. Every class, and by extension every module, **must** have one, and only one, reason to change. This means each class should have a single, well-defined responsibility.
 
@@ -65,26 +67,13 @@ Third-party libraries are managed by PlatformIO. You **must not** modify the sou
 
 ## 3. Hardware & Network Specifications
 
-### Pin Mapping (The Scout - Basic)
-
-| Function              | GPIO Pin | Notes                                  |
-| --------------------- | -------- | -------------------------------------- |
-| Factory Reset Button  | IO02     | Input, requires pull-up                |
-| System LED (WS2812B)  | IO03     | Addressable LED, Pixel 0               |
-| PIR Sensor Output     | IO13     | Digital Input from Logic Level Shifter |
-| Charge Status Input   | IO14     | Digital Input from BQ24074             |
-| LD2410S RX            | IO15     | Connects to LD2410S TX pin             |
-| LD2410S TX            | IO16     | Connects to LD2410S RX pin             |
-| Power Good Input      | IO21     | Digital Input from BQ24074             |
-| Buzzer                | IO41     | Output, requires PWM for tones         |
-| Charge Status LED     | IO42     | Digital Output, mirrors IO14 state     |
-| Activity LED (WS2812B)| IO45     | Addressable LED, Pixel 1               |
-| LD2410S Interrupt     | IO48     | Digital Input, for presence detection  |
+### Pin Mapping and Hardware Interfaces
+All hardware pin assignments, interface details (like UART baud rates), and component-specific notes are defined in the **`HARDWARE_SPEC.md`** document. That file is the single source of truth for all physical connections.
 
 ### MQTT Broker Configuration
 | Parameter     | Value          |
 | ------------- | -------------- |
-| MQTT_BROKER   | "192.168.40.6" |
+| MQTT_BROKER   | "19-2.168.40.6" |
 | MQTT_PORT     | 1883           |
 | MQTT_USER     | "mqtt-user"    |
 | MQTT_PASSWORD | "##DikTrill45" |
