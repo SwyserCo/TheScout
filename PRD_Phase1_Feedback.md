@@ -23,6 +23,7 @@ This phase involves implementing the three core feedback modules. The `FeedbackM
 ### Acceptance Criteria
 
 #### A. `BuzzerController` Class (`feedback/BuzzerController.h` & `.cpp`)
+* [ ] **Hardware Requirement**: The buzzer is a passive electromagnetic type. It **requires a PWM signal** of a specific frequency to produce a tone. Simply setting the pin HIGH or LOW will **not** work and will produce no sound. The implementation **must** use the ESP32's `ledc` (LED Control) peripheral to generate these tones.
 * [ ] **Power-On Sound**: The `begin()` method of this class must play a single, short "boot" beep (150ms duration) to confirm the device has powered on.
 * [ ] **Thematic Sound Abstraction**: The specific notes and durations for each sound **must** be defined as constants. Use simple, distinct tones for now.
     * `Success`: Two quick, rising notes.
@@ -40,11 +41,12 @@ This phase involves implementing the three core feedback modules. The `FeedbackM
 * [ ] **Animation Engine**: The `update()` method must drive a non-blocking animation engine. All fade effects must be a smooth "breathing" (sine-wave) effect with a fixed fade duration of 50ms.
 * [ ] **Animation Type Definition**: An `enum class LedAnimation` must be defined: `SOLID`, `BLINK`, `PULSE`.
 * [ ] **Color Palette & Pixels**: The header file must define the standard color palette and pixel names (`PIXEL_SYSTEM`, `PIXEL_ACTIVITY`).
-    * `HEARTHGUARD_GREEN`: (0, 255, 0)
-    * `HEARTHGUARD_RED`: (255, 0, 0)
-    * `HEARTHGUARD_BLUE`: (0, 0, 255)
-    * `HEARTHGUARD_ORANGE`: (255, 165, 0)
-    * `HEARTHGUARD_YELLOW`: (255, 255, 0)
+    * The colors **must** be defined using the `Adafruit_NeoPixel::Color(r, g, b)` helper function to ensure correctness.
+    * `HEARTHGUARD_GREEN`: `Color(0, 255, 0)`
+    * `HEARTHGUARD_RED`: `Color(255, 0, 0)`
+    * `HEARTHGUARD_BLUE`: `Color(0, 0, 255)`
+    * `HEARTHGUARD_ORANGE`: `Color(255, 165, 0)`
+    * `HEARTHGUARD_YELLOW`: `Color(255, 255, 0)`
 * [ ] **Required Methods**:
     * `void begin()`: Initializes both NeoPixel objects. LEDs are off by default.
     * `void update()`: Must be called in the main loop to drive all animations.
@@ -63,10 +65,59 @@ This phase involves implementing the three core feedback modules. The `FeedbackM
 
 ---
 
-## 4. Technical Requirements & Implementation Strategy
+## 4. Verification & Test Plan
+
+To verify the successful implementation of this phase, the `main.cpp` file should be temporarily modified to execute a specific test sequence. This is not a suggestion; it is a mandatory test plan.
+
+### `main.cpp` Test Sequence:
+1.  **In `setup()`**:
+    * After `feedbackManager.begin()`, add the following line:
+      ```cpp
+      feedbackManager.setBrightness(100); // Set brightness to ~40% for testing
+      ```
+2.  **In `loop()`**:
+    * The main loop should contain a simple, non-blocking state machine using `millis()` to demonstrate the different features.
+
+    ```cpp
+    // Example Test Logic for main.cpp loop()
+    static uint32_t lastChange = 0;
+    static int testState = 0;
+
+    if (millis() - lastChange > 5000) { // Change state every 5 seconds
+      lastChange = millis();
+      testState++;
+      if (testState > 4) testState = 0;
+
+      switch (testState) {
+        case 0:
+          Serial.println("TEST: Starting SOLID GREEN animation on System LED.");
+          feedbackManager.startAnimation(PIXEL_SYSTEM, HEARTHGUARD_GREEN, LedAnimation::SOLID, 0);
+          feedbackManager.playSuccess();
+          break;
+        case 1:
+          Serial.println("TEST: Starting fast BLINK ORANGE on Activity LED.");
+          feedbackManager.startAnimation(PIXEL_ACTIVITY, HEARTHGUARD_ORANGE, LedAnimation::BLINK, 200);
+          break;
+        case 2:
+          Serial.println("TEST: Starting slow PULSE BLUE on System LED.");
+          feedbackManager.startAnimation(PIXEL_SYSTEM, HEARTHGUARD_BLUE, LedAnimation::PULSE, 2000);
+          feedbackManager.turnOff(PIXEL_ACTIVITY); // Turn off other LED
+          break;
+        case 3:
+          Serial.println("TEST: Enabling Stealth Mode.");
+          feedbackManager.setStealthMode(true);
+          feedbackManager.playFailure(); // This should do nothing
+          break;
+        case 4:
+          Serial.println("TEST: Disabling Stealth Mode.");
+          feedbackManager.setStealthMode(false);
+          break;
+      }
+    }
+    ```
 
 ### Instructions for Copilot:
 1.  **Adhere to SRP**: Follow the Single Responsibility Principle. The three classes created must each have a single, clear responsibility.
 2.  **Use Specified Libraries**: You **must** use `Adafruit NeoPixel` for LEDs and `Preferences` for storage.
-3.  **Implement Animations**: The LED animations must be smooth and non-blocking.
-4.  **Verification**: After generating the code, run `pio run`. The build **must** succeed. Test that brightness and stealth settings persist after a reboot.
+3.  **Implement Test Plan**: After generating the module code, you must populate the `main.cpp` file with the test sequence described above.
+4.  **Verification**: After generating all the files and code, you must verify it by running the command `pio run`. The build **must** succeed without any errors. The final test is to flash the device and observe that the LEDs and buzzer perform the test sequence exactly as described.

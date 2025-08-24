@@ -28,17 +28,6 @@ enum class SystemState {
 // LED Animation Types
 // ==========================================
 
-/**
- * @brief LED animation patterns
- */
-enum class LedAnimation {
-    SOLID,                 // Solid color
-    BLINK,                 // Simple blink pattern
-    PULSE,                 // Breathing/pulse pattern
-    RAINBOW,               // Rainbow cycle
-    OFF                    // LED off
-};
-
 // ==========================================
 // Sensor Data Structures
 // ==========================================

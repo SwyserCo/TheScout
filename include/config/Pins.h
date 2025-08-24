@@ -21,7 +21,7 @@
 // System LED (WS2812B) - System status feedback
 #define SYSTEM_LED_PIN          3
 
-// Activity LED (WS2812B) - Activity status feedback
+// Activity LED (WS2812B) - Activity status feedback  
 #define ACTIVITY_LED_PIN        45
 
 // Charge Status LED - Simple digital output, mirrors IO14 state  
