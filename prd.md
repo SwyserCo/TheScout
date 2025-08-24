@@ -28,13 +28,17 @@ The code must be clean, well-documented, and adhere to good software engineering
 Third-party libraries are managed by PlatformIO. You **must not** modify the source code of these libraries. If a library's functionality needs to be extended, create a "wrapper" class within our own source directories.
 
 ### Core Libraries & Dependencies
-| Functionality       | Recommended Library | PlatformIO ID         |
-| ------------------- | ------------------- | --------------------- |
-| WiFi Setup / Portal | WiFiManager         | `tzapu/WiFiManager`   |
-| MQTT Communication  | PubSubClient        | `knolleary/PubSubClient` |
-| JSON Handling       | ArduinoJson         | `bblanchon/ArduinoJson` |
-| WS2812B LEDs        | Adafruit NeoPixel   | `adafruit/Adafruit NeoPixel` |
-| LD2410S Sensor      | ld2410              | `remsh/ld2410`        |
+To ensure consistency and leverage robust, community-tested code, this project will use the following core libraries. These **must** be used to implement their respective functionalities.
+
+| Functionality       | Recommended Library | PlatformIO `lib_deps` Entry                                  |
+| ------------------- | ------------------- | ------------------------------------------------------------ |
+| WiFi Setup / Portal | WiFiManager         | `tzapu/WiFiManager`                                          |
+| (WiFiManager Dep.)  | ESPAsyncWebServer   | `https://github.com/me-no-dev/ESPAsyncWebServer.git`         |
+| (WiFiManager Dep.)  | AsyncTCP            | `https://github.com/me-no-dev/AsyncTCP.git`                  |
+| MQTT Communication  | PubSubClient        | `knolleary/PubSubClient`                                     |
+| JSON Handling       | ArduinoJson         | `bblanchon/ArduinoJson`                                      |
+| WS2812B LEDs        | Adafruit NeoPixel   | `adafruit/Adafruit NeoPixel`                                 |
+| LD2410S Sensor      | ld2410              | `https://github.com/remsh/ld2410.git`                        |
 
 ### Project Folder Structure
 * **project/**
