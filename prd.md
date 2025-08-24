@@ -44,6 +44,7 @@ Third-party libraries are managed by PlatformIO. You **must not** modify the sou
         * **config/**
             * `Settings.h`
             * `Pins.h`
+            * `DataTypes.h`
         * **feedback/**
             * `LedController.h`
             * `BuzzerController.h`
@@ -73,7 +74,7 @@ All hardware pin assignments, interface details (like UART baud rates), and comp
 ### MQTT Broker Configuration
 | Parameter     | Value          |
 | ------------- | -------------- |
-| MQTT_BROKER   | "19-2.168.40.6" |
+| MQTT_BROKER   | "192.168.40.6" |
 | MQTT_PORT     | 1883           |
 | MQTT_USER     | "mqtt-user"    |
 | MQTT_PASSWORD | "##DikTrill45" |
