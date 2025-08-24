@@ -101,3 +101,49 @@ enum class MqttState {
     FAILED,                // Connection failed
     RECONNECTING           // Attempting to reconnect
 };
+
+// ==========================================
+// Data Structures
+// ==========================================
+
+/**
+ * @brief Central data contract between SensorManager and MqttHandler
+ * 
+ * This struct serves as the data contract for sensor readings that will
+ * be published to MQTT. All sensor data passes through this structure.
+ */
+struct SensorData {
+    // Motion Detection
+    bool pirMotionDetected;
+    bool ld2410sPresenceDetected;
+    bool ld2410sMovementDetected;
+    
+    // Power Status
+    bool isUsbPowered;
+    bool isBatteryCharging;
+    bool isChargeComplete;
+    
+    // Sensor Values
+    float batteryVoltage;
+    int ld2410sDistance;
+    
+    // Timestamps
+    unsigned long lastPirTrigger;
+    unsigned long lastLd2410sTrigger;
+    unsigned long dataTimestamp;
+    
+    // Constructor
+    SensorData() {
+        pirMotionDetected = false;
+        ld2410sPresenceDetected = false;
+        ld2410sMovementDetected = false;
+        isUsbPowered = false;
+        isBatteryCharging = false;
+        isChargeComplete = false;
+        batteryVoltage = 0.0;
+        ld2410sDistance = 0;
+        lastPirTrigger = 0;
+        lastLd2410sTrigger = 0;
+        dataTimestamp = millis();
+    }
+};

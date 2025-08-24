@@ -27,12 +27,9 @@ void setup() {
     // Initialize Serial for ESP32-S3 with USB CDC
     Serial.begin(115200);
     
-    // Wait for USB CDC to be ready (important for ESP32-S3)
-    while (!Serial && millis() < 5000) {
-        delay(10);
-    }
-    
-    delay(1000); // Extra delay for stability
+    // Serial Monitor Wait (Critical for ESP32-S3)
+    delay(1000); // Wait 1 second
+    while (!Serial); // Wait for serial connection
     
     #ifdef DEBUG
     Serial.println("=====================================");
